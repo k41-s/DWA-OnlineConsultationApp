@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion.Internal;
+using WebAPI.DTOs;
 using WebAPI.Models;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
@@ -68,10 +69,24 @@ namespace WebAPI.Controllers
 
         // POST api/mentors
         [HttpPost]
-        public async Task<ActionResult<Mentor>> CreateMentor([FromBody]Mentor mentor)
+        public async Task<ActionResult<Mentor>> CreateMentor([FromBody]MentorCreateDTO dto)
         {
             try
             {
+                var user = await _context.Users.FindAsync(dto.UserId);
+                var typeOfWork = await _context.TypeOfWorks.FindAsync(dto.TypeOfWorkId);
+                var areas = await _context.Areas.Where(a => dto.AreaIds.Contains(a.Id)).ToListAsync();
+
+                if (user == null || typeOfWork == null)
+                    return BadRequest("Invalid user or type of work ID.");
+
+                Mentor mentor = new Mentor
+                {
+                    Id = dto.UserId, // Assuming UserId = MentorId (1:1)
+                    TypeOfWorkId = dto.TypeOfWorkId,
+                    Areas = areas
+                };
+
                 _context.Mentors.Add(mentor);
                 await _context.SaveChangesAsync();
 
@@ -87,8 +102,22 @@ namespace WebAPI.Controllers
 
         // PUT api/mentors/5
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateMentor(int id, [FromBody]Mentor mentor)
+        public async Task<IActionResult> UpdateMentor(int id, [FromBody]MentorCreateDTO dto)
         {
+            var user = await _context.Users.FindAsync(dto.UserId);
+            var typeOfWork = await _context.TypeOfWorks.FindAsync(dto.TypeOfWorkId);
+            var areas = await _context.Areas.Where(a => dto.AreaIds.Contains(a.Id)).ToListAsync();
+
+            if (user == null || typeOfWork == null)
+                return BadRequest("Invalid user or type of work ID.");
+
+            Mentor mentor = new Mentor
+            {
+                Id = dto.UserId, // Assuming UserId = MentorId (1:1)
+                TypeOfWorkId = dto.TypeOfWorkId,
+                Areas = areas
+            };
+
             if (id != mentor.Id)
             {
                 await AddLogAsync("Warning", $"Update failed: Mentor ID mismatch (url={id}, body={mentor.Id}).");
@@ -134,11 +163,19 @@ namespace WebAPI.Controllers
                 return NotFound();
             }
 
-            _context.Mentors.Remove(mentor);
-            await _context.SaveChangesAsync();
+            try
+            {
+                _context.Mentors.Remove(mentor);
+                await _context.SaveChangesAsync();
 
-            await AddLogAsync("Information", $"Mentor with id={id} deleted.");
-            return NoContent();
+                await AddLogAsync("Information", $"Mentor with id={id} deleted.");
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                await AddLogAsync("Error", $"Error deleting mentor");
+                return StatusCode(500, $"An unexpected error occurred: {ex.Message}");
+            }
         }
 
         // GET: api/mentors/search?query=John&page=1&count=10
