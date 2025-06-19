@@ -1,0 +1,36 @@
+﻿@model WebApp.ViewModels.MentorViewModel
+
+@{
+    ViewData["Title"] = "Mentor Details";
+}
+
+<h2>@ViewData["Title"]</h2>
+
+<div>
+    <dl class="row">
+        <dt class="col-sm-2">Name</dt>
+        <dd class="col-sm-10">@Model.Name</dd>
+
+        <dt class="col-sm-2">Surname</dt>
+        <dd class="col-sm-10">@Model.Surname</dd>
+
+        <dt class="col-sm-2">Type of Work</dt>
+        <dd class="col-sm-10">@Model.TypeOfWorkName</dd>
+
+        <dt class="col-sm-2">Areas</dt>
+        <dd class="col-sm-10">
+            @if (Model.AreaNames != null)
+            {
+                <ul>
+                    @foreach (var area in Model.AreaNames)
+                    {
+                        <li>@area</li>
+                    }
+                </ul>
+            }
+        </dd>
+    </dl>
+</div>
+
+<a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">Edit</a>
+<a asp-action="Index" class="btn btn-secondary">Back to List</a>

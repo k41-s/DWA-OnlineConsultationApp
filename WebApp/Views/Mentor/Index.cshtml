@@ -1,0 +1,84 @@
+﻿@model IEnumerable<WebApp.ViewModels.MentorViewModel>
+
+@{
+    ViewData["Title"] = "Mentors List";
+}
+
+<h2>@ViewData["Title"]</h2>
+
+<div class="btn-group mb-3" role="group" aria-label="Mentor CRUD navigation">
+    <!-- This page -->
+    <a asp-action="Index" class="btn btn-primary">List Mentors</a>
+    <!-- Create new mentor-->
+    <a asp-action="Create" class="btn btn-success">Add New Mentor</a>
+</div>
+
+<form method="get" asp-action="Index" class="form-inline mb-3">
+    <div class="form-group mr-2">
+        <input type="text" name="searchName" value="@Context.Request.Query["searchName"]" placeholder="Search by name" class="form-control" />
+    </div>
+    <div class="form-group mr-2">
+        <select name="typeOfWorkId" class="form-control">
+            <option value="0">-- All Types of Work --</option>
+            @if((List<WebApp.Models.TypeOfWork>)ViewData["TypeOfWorks"] != null)
+            {
+                @foreach (var type in (List<WebApp.Models.TypeOfWork>)ViewData["TypeOfWorks"])
+                {
+                    var selected = Context.Request.Query["typeOfWorkId"] == type.Id.ToString() ? "selected" : "";
+                    <option value="@type.Id" selected="selected">@type.Name</option>
+                }
+            }
+            
+        </select>
+    </div>
+    <button type="submit" class="btn btn-primary">Search</button>
+</form>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>User Name</th>
+            <th>Type of Work</th>
+            <th></th> <!-- For actions -->
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var mentor in Model)
+        {
+            <tr>
+                <td>@mentor.Name</td>
+                <td>@mentor.Surname</td>
+                <td>@mentor.TypeOfWorkName</td>
+                <td>
+                    <a asp-action="Details" asp-route-id="@mentor.Id" class="btn btn-info btn-sm">Details</a>
+                    <a asp-action="Edit" asp-route-id="@mentor.Id" class="btn btn-warning btn-sm">Edit</a>
+                    <a asp-action="Delete" asp-route-id="@mentor.Id" class="btn btn-danger btn-sm">Delete</a>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<!-- Pagination controls -->
+<nav aria-label="Page navigation">
+    <ul class="pagination">
+        @{
+            int totalPages = (int)Math.Ceiling((double)ViewBag.TotalItems / ViewBag.PageSize);
+            int currentPage = ViewBag.Page;
+        }
+
+        <li class="page-item @(currentPage <= 1 ? "disabled" : "")">
+            <a class="page-link" asp-action="Index" asp-route-page="@(currentPage - 1)" asp-route-searchName="@Context.Request.Query["searchName"]" asp-route-typeOfWorkId="@Context.Request.Query["typeOfWorkId"]">Previous</a>
+        </li>
+
+        <li class="page-item disabled">
+            <span class="page-link">
+                Page @currentPage of @totalPages
+            </span>
+        </li>
+
+        <li class="page-item @(currentPage >= totalPages ? "disabled" : "")">
+            <a class="page-link" asp-action="Index" asp-route-page="@(currentPage + 1)" asp-route-searchName="@Context.Request.Query["searchName"]" asp-route-typeOfWorkId="@Context.Request.Query["typeOfWorkId"]">Next</a>
+        </li>
+    </ul>
+</nav>

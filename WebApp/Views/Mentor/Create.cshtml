@@ -1,0 +1,42 @@
+﻿@model WebApp.ViewModels.MentorViewModel
+
+@{
+    ViewData["Title"] = "Create Mentor";
+}
+
+<h2>@ViewData["Title"]</h2>
+
+<form asp-action="Create" method="post">
+    <div class="form-group">
+        <label asp-for="Name"></label>
+        <input asp-for="Name" class="form-control" />
+        <span asp-validation-for="Name" class="text-danger"></span>
+    </div>
+
+    <div class="form-group">
+        <label asp-for="Surname"></label>
+        <input asp-for="Surname" class="form-control" />
+        <span asp-validation-for="Surname" class="text-danger"></span>
+    </div>
+
+    <div class="form-group">
+        <label asp-for="TypeOfWorkId"></label>
+        <select asp-for="TypeOfWorkId" class="form-control" asp-items="ViewBag.TypeOfWorkId"></select>
+        <span asp-validation-for="TypeOfWorkId" class="text-danger"></span>
+    </div>
+
+    <div class="form-group">
+        <label asp-for="AreaNames"></label>
+        <select asp-for="AreaNames" class="form-control" asp-items="ViewBag.AreaNames"></select>
+        <span asp-validation-for="AreaNames" class="text-danger"></span>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Create</button>
+    <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+</form>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}

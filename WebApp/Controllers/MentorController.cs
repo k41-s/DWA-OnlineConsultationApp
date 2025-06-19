@@ -1,0 +1,242 @@
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.EntityFrameworkCore;
+using WebApp.Models;
+using WebApp.ViewModels;
+
+namespace WebApp.Controllers
+{
+    [Authorize(Roles = "admin")]
+    public class MentorController : Controller
+    {
+        private readonly ConsultationsContext _context;
+
+        public MentorController(ConsultationsContext context)
+        {
+            _context = context;
+        }
+
+        // GET: Mentor
+        public async Task<IActionResult> Index(string searchName, int? typeOfWorkId, int page = 1, int pageSize = 10)
+        {
+            var query = _context.Mentors
+                .Include(m => m.Areas)
+                .Include(m => m.TypeOfWork)
+                .AsQueryable();
+
+            if (!string.IsNullOrEmpty(searchName))
+            {
+                query = query.Where(m => m.User.Name.Contains(searchName) || m.User.Surname.Contains(searchName));
+            }
+            if (typeOfWorkId.HasValue && typeOfWorkId.Value > 0)
+            {
+                query = query.Where(m => m.TypeOfWork.Id == typeOfWorkId.Value);
+            }
+
+            var totalItems = await query.CountAsync();
+
+            var mentors = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            var mentorVMs = mentors.Select(m => new MentorViewModel
+            {
+                Id = m.Id,
+                Name = m.Name,
+                Surname = m.Surname,
+                TypeOfWorkId = m.TypeOfWork.Id,
+                TypeOfWorkName = m.TypeOfWork.Name,
+                AreaNames = m.Areas.Select(a => a.Name).ToList()
+            }).ToList();
+
+            ViewBag.TotalItems = totalItems;
+            ViewBag.Page = page;
+            ViewBag.PageSize = pageSize;
+
+            return View(mentorVMs);
+        }
+
+        // GET: Mentor/Details/5
+        public async Task<IActionResult> Details(int id)
+        {
+            var mentor = await _context.Mentors
+                .Include(m => m.Areas)
+                .Include(m => m.TypeOfWork)
+                .FirstOrDefaultAsync(m => m.Id == id);
+
+            if (mentor == null) return NotFound();
+
+            var vm = new MentorViewModel
+            {
+                Id = mentor.Id,
+                Name = mentor.Name,
+                Surname = mentor.Surname,
+                TypeOfWorkId = mentor.TypeOfWork.Id,
+                TypeOfWorkName = mentor.TypeOfWork.Name
+            };
+
+            return View(vm);
+        }
+
+        // GET: Mentors/Create
+        public IActionResult Create()
+        {
+            ViewData["TypeOfWorkId"] = new SelectList(_context.TypeOfWorks, "Id", "Name");
+            ViewData["AreaNames"] = new SelectList(_context.Areas, "Id", "Name");
+            return View();
+        }
+
+        // POST: Mentors/Create
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Create(MentorViewModel vm)
+        {
+            if (!ModelState.IsValid)
+            {
+                ViewData["TypeOfWorkId"] = new SelectList(_context.TypeOfWorks, "Id", "Name");
+                ViewData["AreaNames"] = new SelectList(_context.Areas, "Id", "Name");
+
+                return View(vm);
+            }
+
+            var areas = await _context.Areas.Where(a => vm.AreaIds.Contains(a.Id)).ToListAsync();
+
+            var mentor = new Mentor
+            {
+                Name = vm.Name,
+                Surname = vm.Surname,
+                TypeOfWorkId = vm.TypeOfWorkId,
+                Areas = areas
+            };
+
+            try
+            {
+                _context.Mentors.Add(mentor);
+                await _context.SaveChangesAsync();
+                return RedirectToAction(nameof(Index));
+            }
+            catch
+            {
+                ModelState.AddModelError("", "Failed to create mentor.");
+
+                ViewData["TypeOfWorkId"] = new SelectList(_context.TypeOfWorks, "Id", "Name");
+                ViewData["AreaNames"] = new SelectList(_context.Areas, "Id", "Name");
+                return View(vm);
+            }
+        }
+
+        // GET: MentorsController/Edit/5
+        public async Task<IActionResult> Edit(int id)
+        {
+            var mentor = await _context.Mentors
+                .Include(m => m.Areas)
+                .Include(m => m.TypeOfWork)
+                .FirstOrDefaultAsync(m => m.Id == id);
+
+            if (mentor == null) return NotFound();
+
+            var vm = new MentorViewModel
+            {
+                Id = mentor.Id,
+                Name = mentor.Name,
+                Surname = mentor.Surname,
+                TypeOfWorkId = mentor.TypeOfWork.Id
+            };
+
+            ViewData["TypeOfWorkId"] = new SelectList(_context.TypeOfWorks, "Id", "Name");
+            ViewData["AreaNames"] = new SelectList(_context.Areas, "Id", "Name");
+
+            return View(vm);
+        }
+
+        // POST: MentorsController/Edit/5
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(int id, MentorViewModel vm)
+        {
+            if (id != vm.Id) return BadRequest();
+
+            if (!ModelState.IsValid)
+            {
+                ViewData["TypeOfWorkId"] = new SelectList(_context.TypeOfWorks, "Id", "Name");
+                ViewData["AreaNames"] = new SelectList(_context.Areas, "Id", "Name");
+
+                return View(vm);
+            }
+            
+            var mentor = await _context.Mentors.FindAsync(id);
+
+            if (mentor == null) 
+                return NotFound();
+
+            mentor.Name = vm.Name;
+            mentor.Surname = vm.Surname;
+            mentor.TypeOfWorkId = vm.TypeOfWorkId;
+            mentor.Areas = await _context.Areas.Where(a => vm.AreaIds.Contains(a.Id)).ToListAsync();
+
+            try
+            {
+                _context.Update(mentor);
+                await _context.SaveChangesAsync();
+                return RedirectToAction(nameof(Index));
+            }
+            catch
+            {
+                // Log error
+                ModelState.AddModelError("", "Failed to update mentor.");
+
+                ViewData["TypeOfWorkId"] = new SelectList(_context.TypeOfWorks, "Id", "Name");
+                ViewData["AreaNames"] = new SelectList(_context.Areas, "Id", "Name");
+                return View(vm);
+            }
+        }
+
+        // GET: MentorsController/Delete/5
+        public async Task<IActionResult> Delete(int id)
+        {
+            var mentor = await _context.Mentors
+                .Include(m => m.Areas)
+                .Include(m => m.TypeOfWork)
+                .FirstOrDefaultAsync(m => m.Id == id);
+
+            if (mentor == null) return NotFound();
+
+            var vm = new MentorViewModel
+            {
+                Id = mentor.Id,
+                Name = mentor.Name,
+                Surname = mentor.Surname,
+                TypeOfWorkId = mentor.TypeOfWork.Id,
+                TypeOfWorkName = mentor.TypeOfWork.Name,
+                AreaNames = mentor.Areas.Select(a => a.Name).ToList()
+            };
+
+            return View(vm);
+        }
+
+
+        // POST: MentorsController/Delete/5
+        [HttpPost, ActionName("Delete")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteConfirmed(int id)
+        {
+            var mentor = await _context.Mentors.FindAsync(id);
+            if (mentor == null) return NotFound();
+
+            try
+            {
+                _context.Mentors.Remove(mentor);
+                await _context.SaveChangesAsync();
+                return RedirectToAction(nameof(Index));
+            }
+            catch
+            {
+                ModelState.AddModelError("", "Failed to delete mentor.");
+                return View();
+            }
+        }
+    }
+}
