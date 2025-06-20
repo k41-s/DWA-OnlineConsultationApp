@@ -33,23 +33,47 @@ namespace WebAPI.Controllers
 
         // GET: api/mentors
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Mentor>>> GetMentors()
+        public async Task<ActionResult<IEnumerable<MentorDTO>>> GetMentors()
         {
-            return await _context.Mentors.Include(m => m.TypeOfWork).ToListAsync();
+            var mentors = await _context.Mentors
+                .Include(m => m.TypeOfWork)
+                .Include(m => m.Areas)
+                .Select(m => new MentorDTO
+                {
+                    Id = m.Id,
+                    Name = m.Name,
+                    Surname = m.Surname,
+                    TypeOfWorkId = m.TypeOfWork.Id,
+                    TypeOfWorkName = m.TypeOfWork.Name,
+                    AreaIds = m.Areas.Select(a => a.Id).ToList(),
+                    AreaNames = m.Areas.Select(a => a.Name).ToList()
+                })
+                .ToListAsync();
+
+            return Ok(mentors);
         }
 
         // GET api/mentors/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Mentor>> GetMentor(int id)
+        public async Task<ActionResult<MentorDTO>> GetMentor(int id)
         {
             try
             {
-                Mentor? mentor
-                        = await _context.Mentors
-                        .Include(m => m.User)
-                        .Include(m => m.Areas)
-                        .Include(m => m.TypeOfWorkId)
-                        .FirstOrDefaultAsync(m => m.Id == id);
+                var mentor = await _context.Mentors
+                    .Include(m => m.TypeOfWork)
+                    .Include(m => m.Areas)
+                    .Where(m => m.Id == id)
+                    .Select(m => new MentorDTO
+                    {
+                        Id = m.Id,
+                        Name = m.Name,
+                        Surname = m.Surname,
+                        TypeOfWorkId = m.TypeOfWork.Id,
+                        TypeOfWorkName = m.TypeOfWork.Name,
+                        AreaIds = m.Areas.Select(a => a.Id).ToList(),
+                        AreaNames = m.Areas.Select(a => a.Name).ToList()
+                    })
+                    .FirstOrDefaultAsync();
 
                 if (mentor == null)
                 {
@@ -69,20 +93,22 @@ namespace WebAPI.Controllers
 
         // POST api/mentors
         [HttpPost]
-        public async Task<ActionResult<Mentor>> CreateMentor([FromBody]MentorCreateDTO dto)
+        public async Task<ActionResult<MentorDTO>> CreateMentor([FromBody]MentorCreateDTO dto)
         {
             try
             {
-                var user = await _context.Users.FindAsync(dto.UserId);
                 var typeOfWork = await _context.TypeOfWorks.FindAsync(dto.TypeOfWorkId);
-                var areas = await _context.Areas.Where(a => dto.AreaIds.Contains(a.Id)).ToListAsync();
+                if (typeOfWork == null)
+                    return BadRequest("Invalid TypeOfWork ID.");
 
-                if (user == null || typeOfWork == null)
-                    return BadRequest("Invalid user or type of work ID.");
+                var areas = await _context.Areas
+                    .Where(a => dto.AreaIds.Contains(a.Id))
+                    .ToListAsync();
 
-                Mentor mentor = new Mentor
+                var mentor = new Mentor
                 {
-                    Id = dto.UserId, // Assuming UserId = MentorId (1:1)
+                    Name = dto.Name,
+                    Surname = dto.Surname,
                     TypeOfWorkId = dto.TypeOfWorkId,
                     Areas = areas
                 };
@@ -91,7 +117,20 @@ namespace WebAPI.Controllers
                 await _context.SaveChangesAsync();
 
                 await AddLogAsync("Information", $"Mentor with id={mentor.Id} created.");
-                return CreatedAtAction(nameof(GetMentor), new { id = mentor.Id }, mentor);
+
+                // Return the created Mentor as DTO
+                var resultDto = new MentorDTO
+                {
+                    Id = mentor.Id,
+                    Name = mentor.Name,
+                    Surname = mentor.Surname,
+                    TypeOfWorkId = typeOfWork.Id,
+                    TypeOfWorkName = typeOfWork.Name,
+                    AreaIds = areas.Select(a => a.Id).ToList(),
+                    AreaNames = areas.Select(a => a.Name).ToList()
+                };
+
+                return CreatedAtAction(nameof(GetMentor), new { id = mentor.Id }, resultDto);
             }
             catch (Exception ex)
             {
@@ -104,19 +143,33 @@ namespace WebAPI.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateMentor(int id, [FromBody]MentorCreateDTO dto)
         {
-            var user = await _context.Users.FindAsync(dto.UserId);
-            var typeOfWork = await _context.TypeOfWorks.FindAsync(dto.TypeOfWorkId);
-            var areas = await _context.Areas.Where(a => dto.AreaIds.Contains(a.Id)).ToListAsync();
+            if (id <= 0)
+                return BadRequest("Invalid mentor ID.");
 
-            if (user == null || typeOfWork == null)
+            var mentor = await _context.Mentors
+                .Include(m => m.Areas)
+                .FirstOrDefaultAsync(m => m.Id == id);
+
+            if (mentor == null)
+            {
+                await AddLogAsync("Warning", $"Mentor with id={id} not found during update.");
+                return NotFound();
+            }
+
+            var typeOfWork = await _context.TypeOfWorks
+                .FindAsync(dto.TypeOfWorkId);
+
+            if (typeOfWork == null)
                 return BadRequest("Invalid user or type of work ID.");
 
-            Mentor mentor = new Mentor
-            {
-                Id = dto.UserId, // Assuming UserId = MentorId (1:1)
-                TypeOfWorkId = dto.TypeOfWorkId,
-                Areas = areas
-            };
+            var areas = await _context.Areas
+                .Where(a => dto.AreaIds.Contains(a.Id))
+                .ToListAsync();
+
+            mentor.Name = dto.Name;
+            mentor.Surname = dto.Surname;
+            mentor.TypeOfWorkId = dto.TypeOfWorkId;
+            mentor.Areas = areas;
 
             if (id != mentor.Id)
             {
@@ -180,7 +233,7 @@ namespace WebAPI.Controllers
 
         // GET: api/mentors/search?query=John&page=1&count=10
         [HttpGet("search")]
-        public async Task<ActionResult<IEnumerable<Mentor>>> SearchMentors(
+        public async Task<ActionResult<IEnumerable<MentorDTO>>> SearchMentors(
             string? name = null,
             int page = 1,
             int pageSize = 10)
@@ -194,7 +247,7 @@ namespace WebAPI.Controllers
                     return NotFound("Mentor dataset not found.");
 
                 var mentorsQuery = _context.Mentors
-                    .Include(m => m.User)
+                    .Include(m => m.Areas)
                     .Include(m => m.TypeOfWork)
                     .AsQueryable();
 
@@ -202,16 +255,26 @@ namespace WebAPI.Controllers
                 {
                     string nameLower = name.ToLower();
                     mentorsQuery = mentorsQuery.Where(m =>
-                        m.User.Name.ToLower().Contains(nameLower) ||
-                        m.User.Surname.ToLower().Contains(nameLower)
+                        m.Name != null && m.Name.ToLower().Contains(nameLower) ||
+                        m.Surname != null && m.Surname.ToLower().Contains(nameLower)
                     );
                 }
 
                 var total = await mentorsQuery.CountAsync();
 
-                List<Mentor> mentors = await mentorsQuery
+                var mentors = await mentorsQuery
                     .Skip((page - 1) * pageSize)
                     .Take(pageSize)
+                    .Select(m => new MentorDTO
+                    {
+                        Id = m.Id,
+                        Name = m.Name,
+                        Surname = m.Surname,
+                        TypeOfWorkId = m.TypeOfWork.Id,
+                        TypeOfWorkName = m.TypeOfWork.Name,
+                        AreaIds = m.Areas.Select(a => a.Id).ToList(),
+                        AreaNames = m.Areas.Select(a => a.Name).ToList()
+                    })
                     .ToListAsync();
 
                 // Log successful search
