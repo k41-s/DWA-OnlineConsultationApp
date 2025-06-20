@@ -28,12 +28,14 @@ namespace WebApp.Controllers
 
             if (!string.IsNullOrEmpty(searchName))
             {
-                query = query.Where(m => m.User.Name.Contains(searchName) || m.User.Surname.Contains(searchName));
+                query = query.Where(m => m.Name.Contains(searchName) || m.Surname.Contains(searchName));
             }
             if (typeOfWorkId.HasValue && typeOfWorkId.Value > 0)
             {
                 query = query.Where(m => m.TypeOfWork.Id == typeOfWorkId.Value);
             }
+
+            ViewData["TypeOfWorkIds"] = await _context.TypeOfWorks.ToListAsync();
 
             var totalItems = await query.CountAsync();
 
@@ -49,6 +51,7 @@ namespace WebApp.Controllers
                 Surname = m.Surname,
                 TypeOfWorkId = m.TypeOfWork.Id,
                 TypeOfWorkName = m.TypeOfWork.Name,
+                AreaIds = m.Areas.Select(a => a.Id).ToList(),
                 AreaNames = m.Areas.Select(a => a.Name).ToList()
             }).ToList();
 
@@ -67,7 +70,8 @@ namespace WebApp.Controllers
                 .Include(m => m.TypeOfWork)
                 .FirstOrDefaultAsync(m => m.Id == id);
 
-            if (mentor == null) return NotFound();
+            if (mentor == null) 
+                return NotFound();
 
             var vm = new MentorViewModel
             {
@@ -75,7 +79,9 @@ namespace WebApp.Controllers
                 Name = mentor.Name,
                 Surname = mentor.Surname,
                 TypeOfWorkId = mentor.TypeOfWork.Id,
-                TypeOfWorkName = mentor.TypeOfWork.Name
+                TypeOfWorkName = mentor.TypeOfWork.Name,
+                AreaIds = mentor.Areas.Select(a => a.Id).ToList(),
+                AreaNames = mentor.Areas.Select(a => a.Name).ToList()
             };
 
             return View(vm);
@@ -85,7 +91,7 @@ namespace WebApp.Controllers
         public IActionResult Create()
         {
             ViewData["TypeOfWorkId"] = new SelectList(_context.TypeOfWorks, "Id", "Name");
-            ViewData["AreaNames"] = new SelectList(_context.Areas, "Id", "Name");
+            ViewData["AreaIds"] = new MultiSelectList(_context.Areas, "Id", "Name");
             return View();
         }
 
@@ -96,8 +102,13 @@ namespace WebApp.Controllers
         {
             if (!ModelState.IsValid)
             {
+                foreach (var error in ModelState.Values.SelectMany(v => v.Errors))
+                {
+                    ModelState.AddModelError("", error.ErrorMessage);
+                }
+
                 ViewData["TypeOfWorkId"] = new SelectList(_context.TypeOfWorks, "Id", "Name");
-                ViewData["AreaNames"] = new SelectList(_context.Areas, "Id", "Name");
+                ViewData["AreaIds"] = new MultiSelectList(_context.Areas, "Id", "Name");
 
                 return View(vm);
             }
@@ -118,12 +129,12 @@ namespace WebApp.Controllers
                 await _context.SaveChangesAsync();
                 return RedirectToAction(nameof(Index));
             }
-            catch
+            catch (Exception ex)
             {
-                ModelState.AddModelError("", "Failed to create mentor.");
+                ModelState.AddModelError("", $"Failed to create mentor: {ex.Message}");
 
                 ViewData["TypeOfWorkId"] = new SelectList(_context.TypeOfWorks, "Id", "Name");
-                ViewData["AreaNames"] = new SelectList(_context.Areas, "Id", "Name");
+                ViewData["AreaIds"] = new MultiSelectList(_context.Areas, "Id", "Name");
                 return View(vm);
             }
         }
@@ -136,18 +147,21 @@ namespace WebApp.Controllers
                 .Include(m => m.TypeOfWork)
                 .FirstOrDefaultAsync(m => m.Id == id);
 
-            if (mentor == null) return NotFound();
+            if (mentor == null) 
+                return NotFound();
 
             var vm = new MentorViewModel
             {
                 Id = mentor.Id,
                 Name = mentor.Name,
                 Surname = mentor.Surname,
-                TypeOfWorkId = mentor.TypeOfWork.Id
+                TypeOfWorkId = mentor.TypeOfWork.Id,
+                AreaIds = mentor.Areas.Select(a => a.Id).ToList(),
+                AreaNames = mentor.Areas.Select(a => a.Name).ToList()
             };
 
             ViewData["TypeOfWorkId"] = new SelectList(_context.TypeOfWorks, "Id", "Name");
-            ViewData["AreaNames"] = new SelectList(_context.Areas, "Id", "Name");
+            ViewData["AreaIds"] = new MultiSelectList(_context.Areas, "Id", "Name");
 
             return View(vm);
         }
@@ -162,7 +176,7 @@ namespace WebApp.Controllers
             if (!ModelState.IsValid)
             {
                 ViewData["TypeOfWorkId"] = new SelectList(_context.TypeOfWorks, "Id", "Name");
-                ViewData["AreaNames"] = new SelectList(_context.Areas, "Id", "Name");
+                ViewData["AreaIds"] = new MultiSelectList(_context.Areas, "Id", "Name");
 
                 return View(vm);
             }
@@ -189,7 +203,7 @@ namespace WebApp.Controllers
                 ModelState.AddModelError("", "Failed to update mentor.");
 
                 ViewData["TypeOfWorkId"] = new SelectList(_context.TypeOfWorks, "Id", "Name");
-                ViewData["AreaNames"] = new SelectList(_context.Areas, "Id", "Name");
+                ViewData["AreaIds"] = new MultiSelectList(_context.Areas, "Id", "Name");
                 return View(vm);
             }
         }
@@ -202,7 +216,8 @@ namespace WebApp.Controllers
                 .Include(m => m.TypeOfWork)
                 .FirstOrDefaultAsync(m => m.Id == id);
 
-            if (mentor == null) return NotFound();
+            if (mentor == null) 
+                return NotFound();
 
             var vm = new MentorViewModel
             {
@@ -211,7 +226,8 @@ namespace WebApp.Controllers
                 Surname = mentor.Surname,
                 TypeOfWorkId = mentor.TypeOfWork.Id,
                 TypeOfWorkName = mentor.TypeOfWork.Name,
-                AreaNames = mentor.Areas.Select(a => a.Name).ToList()
+                AreaNames = mentor.Areas.Select(a => a.Name).ToList(),
+                AreaIds = mentor.Areas.Select(a => a.Id).ToList()
             };
 
             return View(vm);
@@ -224,7 +240,8 @@ namespace WebApp.Controllers
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
             var mentor = await _context.Mentors.FindAsync(id);
-            if (mentor == null) return NotFound();
+            if (mentor == null) 
+                return NotFound();
 
             try
             {

@@ -6,6 +6,17 @@
 
 <h2>@ViewData["Title"]</h2>
 
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="alert alert-danger">
+        @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+        {
+            <div>@error.ErrorMessage</div>
+        }
+    </div>
+}
+
+
 <form asp-action="Create" method="post">
     <div class="form-group">
         <label asp-for="Name"></label>
@@ -20,15 +31,15 @@
     </div>
 
     <div class="form-group">
-        <label asp-for="TypeOfWorkId"></label>
+        <label asp-for="TypeOfWorkId">Type of work</label>
         <select asp-for="TypeOfWorkId" class="form-control" asp-items="ViewBag.TypeOfWorkId"></select>
         <span asp-validation-for="TypeOfWorkId" class="text-danger"></span>
     </div>
 
     <div class="form-group">
-        <label asp-for="AreaNames"></label>
-        <select asp-for="AreaNames" class="form-control" asp-items="ViewBag.AreaNames"></select>
-        <span asp-validation-for="AreaNames" class="text-danger"></span>
+        <label asp-for="AreaIds" class="control-label"> Areas</label>
+        <select asp-for="AreaIds" class="form-control" asp-items="ViewBag.AreaIds" multiple></select>
+        <span asp-validation-for="AreaIds" class="text-danger"></span>
     </div>
 
     <button type="submit" class="btn btn-primary">Create</button>

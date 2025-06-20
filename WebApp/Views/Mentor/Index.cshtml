@@ -7,8 +7,6 @@
 <h2>@ViewData["Title"]</h2>
 
 <div class="btn-group mb-3" role="group" aria-label="Mentor CRUD navigation">
-    <!-- This page -->
-    <a asp-action="Index" class="btn btn-primary">List Mentors</a>
     <!-- Create new mentor-->
     <a asp-action="Create" class="btn btn-success">Add New Mentor</a>
 </div>
@@ -17,15 +15,18 @@
     <div class="form-group mr-2">
         <input type="text" name="searchName" value="@Context.Request.Query["searchName"]" placeholder="Search by name" class="form-control" />
     </div>
+
     <div class="form-group mr-2">
         <select name="typeOfWorkId" class="form-control">
             <option value="0">-- All Types of Work --</option>
-            @if((List<WebApp.Models.TypeOfWork>)ViewData["TypeOfWorks"] != null)
+            @if (ViewData["TypeOfWorkIds"] is List<WebApp.Models.TypeOfWork> typeList)
             {
-                @foreach (var type in (List<WebApp.Models.TypeOfWork>)ViewData["TypeOfWorks"])
+                var selectedId = Context.Request.Query["typeOfWorkId"].ToString();
+
+                foreach (var type in typeList)
                 {
-                    var selected = Context.Request.Query["typeOfWorkId"] == type.Id.ToString() ? "selected" : "";
-                    <option value="@type.Id" selected="selected">@type.Name</option>
+                    var selected = selectedId == type.Id.ToString() ? "selected" : "";
+                    @:<option value="@type.Id" @selected>@type.Name</option>
                 }
             }
             
@@ -37,7 +38,8 @@
 <table class="table table-striped">
     <thead>
         <tr>
-            <th>User Name</th>
+            <th>Name</th>
+            <th>Surname</th>
             <th>Type of Work</th>
             <th></th> <!-- For actions -->
         </tr>

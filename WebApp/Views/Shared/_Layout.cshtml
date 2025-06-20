@@ -38,7 +38,7 @@
                     <div style="justify-content: end;">
                         @if (!User.Identity.IsAuthenticated)
                         {
-                            <button class="btn-outline-dark" asp-area="" asp-controller="Account" asp-action="Login">Login</button>
+                            <a class="nav-link text-dark" style="border:solid black;" asp-area="" asp-controller="Account" asp-action="Login">Login</a>
                         }
                         else
                         {
@@ -47,7 +47,7 @@
                                     <span class="nav-link" style="color: black;">Logged in as <strong>@User.Identity.Name</strong></span>
                                 </li>
                                 <li>
-                                    <button class="nav-link text-dark" asp-area="" asp-controller="Account" asp-action="Logout">Logout</button>
+                                    <a class="nav-link text-dark" style="border:solid black;" asp-area="" asp-controller="Account" asp-action="Logout">Logout</a>
                                 </li>
                             </ul>
                         }

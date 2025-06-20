@@ -18,6 +18,4 @@ public partial class User
     public string? Surname { get; set; }
 
     public virtual ICollection<Consultation> Consultations { get; set; } = new List<Consultation>();
-
-    public virtual Mentor? Mentor { get; set; }
 }
