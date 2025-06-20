@@ -59,7 +59,17 @@ namespace WebApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(AreaViewModel vm)
         {
-            if (!ModelState.IsValid) return View(vm);
+            if (!ModelState.IsValid) 
+                return View(vm);
+
+            bool exists = await _context.Areas
+                .AnyAsync(a => a.Name == vm.Name);
+
+            if (exists)
+            {
+                ModelState.AddModelError("", "An area with this name already exists.");
+                return View(vm);
+            }
 
             var area = new Area
             {
@@ -75,7 +85,8 @@ namespace WebApp.Controllers
         public async Task<IActionResult> Edit(int id)
         {
             var area = await _context.Areas.FindAsync(id);
-            if (area == null) return NotFound();
+            if (area == null) 
+                return NotFound();
 
             var vm = new AreaViewModel
             {
@@ -91,11 +102,25 @@ namespace WebApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(int id, AreaViewModel vm)
         {
-            if (id != vm.Id) return BadRequest();
-            if (!ModelState.IsValid) return View(vm);
+            if (id != vm.Id) 
+                return BadRequest();
+
+            if (!ModelState.IsValid) 
+                return View(vm);
+
+            var duplicate = await _context.Areas
+                .AnyAsync(a => a.Id != id && a.Name == vm.Name);
+
+            if (duplicate)
+            {
+                ModelState.AddModelError("", "Another area with this name already exists.");
+                return View(vm);
+            }
 
             var area = await _context.Areas.FindAsync(id);
-            if (area == null) return NotFound();
+
+            if (area == null) 
+                return NotFound();
 
             area.Name = vm.Name;
 

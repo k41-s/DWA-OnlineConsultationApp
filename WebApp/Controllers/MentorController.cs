@@ -113,6 +113,17 @@ namespace WebApp.Controllers
                 return View(vm);
             }
 
+            bool duplicateExists = await _context.Mentors
+                .AnyAsync(m => m.Name == vm.Name && m.Surname == vm.Surname);
+
+            if (duplicateExists)
+            {
+                ModelState.AddModelError("", "A mentor with this name already exists.");
+                ViewData["TypeOfWorkId"] = new SelectList(_context.TypeOfWorks, "Id", "Name");
+                ViewData["AreaNames"] = new SelectList(_context.Areas, "Id", "Name");
+                return View(vm);
+            }
+
             var areas = await _context.Areas.Where(a => vm.AreaIds.Contains(a.Id)).ToListAsync();
 
             var mentor = new Mentor
@@ -171,7 +182,8 @@ namespace WebApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(int id, MentorViewModel vm)
         {
-            if (id != vm.Id) return BadRequest();
+            if (id != vm.Id) 
+                return BadRequest();
 
             if (!ModelState.IsValid)
             {
@@ -180,8 +192,24 @@ namespace WebApp.Controllers
 
                 return View(vm);
             }
+
+            var duplicate = await _context.Mentors
+                .AnyAsync(m => m.Id != id && m.Name == vm.Name && m.Surname == vm.Surname);
             
-            var mentor = await _context.Mentors.FindAsync(id);
+            if (duplicate)
+            {
+                ModelState.AddModelError("", "Another mentor with this name already exists.");
+                
+                ViewData["TypeOfWorkId"] = new SelectList(_context.TypeOfWorks, "Id", "Name");
+                ViewData["AreaNames"] = new SelectList(_context.Areas, "Id", "Name");
+                
+                return View(vm);
+            }
+
+            var mentor = await _context.Mentors
+                .Include(m => m.Areas)
+                .FirstOrDefaultAsync(m => m.Id == id);
+
 
             if (mentor == null) 
                 return NotFound();

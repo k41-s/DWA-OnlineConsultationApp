@@ -34,7 +34,7 @@ public partial class ConsultationsContext : DbContext
     {
         modelBuilder.Entity<Area>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Area__3214EC07A49DE6E3");
+            entity.HasKey(e => e.Id).HasName("PK__Area__3214EC0729BCC1E1");
 
             entity.ToTable("Area");
 
@@ -43,7 +43,7 @@ public partial class ConsultationsContext : DbContext
 
         modelBuilder.Entity<Consultation>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Consulta__3214EC07D518B502");
+            entity.HasKey(e => e.Id).HasName("PK__Consulta__3214EC0798954498");
 
             entity.ToTable("Consultation");
 
@@ -58,17 +58,17 @@ public partial class ConsultationsContext : DbContext
             entity.HasOne(d => d.Mentor).WithMany(p => p.Consultations)
                 .HasForeignKey(d => d.MentorId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__Consultat__Mento__35BCFE0A");
+                .HasConstraintName("FK__Consultat__Mento__34C8D9D1");
 
             entity.HasOne(d => d.User).WithMany(p => p.Consultations)
                 .HasForeignKey(d => d.UserId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__Consultat__UserI__36B12243");
+                .HasConstraintName("FK__Consultat__UserI__35BCFE0A");
         });
 
         modelBuilder.Entity<Log>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Log__3214EC07C09E7C90");
+            entity.HasKey(e => e.Id).HasName("PK__Log__3214EC077A8AF756");
 
             entity.ToTable("Log");
 
@@ -78,18 +78,17 @@ public partial class ConsultationsContext : DbContext
 
         modelBuilder.Entity<Mentor>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Mentor__3214EC0795B75F5D");
+            entity.HasKey(e => e.Id).HasName("PK__Mentor__3214EC071E668209");
 
             entity.ToTable("Mentor");
 
-            entity.Property(e => e.Id).ValueGeneratedNever();
             entity.Property(e => e.Name).HasMaxLength(100);
             entity.Property(e => e.Surname).HasMaxLength(100);
 
             entity.HasOne(d => d.TypeOfWork).WithMany(p => p.Mentors)
                 .HasForeignKey(d => d.TypeOfWorkId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__Mentor__TypeOfWo__2D27B809");
+                .HasConstraintName("FK__Mentor__TypeOfWo__2C3393D0");
 
             entity.HasMany(d => d.Areas).WithMany(p => p.Mentors)
                 .UsingEntity<Dictionary<string, object>>(
@@ -97,21 +96,21 @@ public partial class ConsultationsContext : DbContext
                     r => r.HasOne<Area>().WithMany()
                         .HasForeignKey("AreaId")
                         .OnDelete(DeleteBehavior.ClientSetNull)
-                        .HasConstraintName("FK__MentorAre__AreaI__30F848ED"),
+                        .HasConstraintName("FK__MentorAre__AreaI__300424B4"),
                     l => l.HasOne<Mentor>().WithMany()
                         .HasForeignKey("MentorId")
                         .OnDelete(DeleteBehavior.ClientSetNull)
-                        .HasConstraintName("FK__MentorAre__Mento__300424B4"),
+                        .HasConstraintName("FK__MentorAre__Mento__2F10007B"),
                     j =>
                     {
-                        j.HasKey("MentorId", "AreaId").HasName("PK__MentorAr__9230FC9CB35D393F");
+                        j.HasKey("MentorId", "AreaId").HasName("PK__MentorAr__9230FC9CDAE11D88");
                         j.ToTable("MentorArea");
                     });
         });
 
         modelBuilder.Entity<TypeOfWork>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__TypeOfWo__3214EC0778761456");
+            entity.HasKey(e => e.Id).HasName("PK__TypeOfWo__3214EC07F0E88F16");
 
             entity.ToTable("TypeOfWork");
 
@@ -120,11 +119,11 @@ public partial class ConsultationsContext : DbContext
 
         modelBuilder.Entity<User>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__User__3214EC075FC21077");
+            entity.HasKey(e => e.Id).HasName("PK__User__3214EC0764B1D0FF");
 
             entity.ToTable("User");
 
-            entity.HasIndex(e => e.Email, "UQ__User__A9D10534946ED710").IsUnique();
+            entity.HasIndex(e => e.Email, "UQ__User__A9D105349250D13B").IsUnique();
 
             entity.Property(e => e.Email).HasMaxLength(255);
             entity.Property(e => e.Name).HasMaxLength(255);

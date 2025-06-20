@@ -60,6 +60,15 @@ namespace WebApp.Controllers
             if (!ModelState.IsValid)
                 return View(vm);
 
+            bool exists = await _context.TypeOfWorks
+                .AnyAsync(t => t.Name == vm.Name);
+
+            if (exists)
+            {
+                ModelState.AddModelError("", "A type of work with this name already exists.");
+                return View(vm);
+            }
+
             var type = new TypeOfWork
             {
                 Name = vm.Name
@@ -102,6 +111,15 @@ namespace WebApp.Controllers
 
             if (!ModelState.IsValid)
                 return View(vm);
+
+            var duplicate = await _context.TypeOfWorks
+                .AnyAsync(t => t.Id != id && t.Name == vm.Name);
+
+            if (duplicate)
+            {
+                ModelState.AddModelError("", "Another type of work with this name already exists.");
+                return View(vm);
+            }
 
             var type = await _context.TypeOfWorks.FindAsync(id);
             if (type == null) return NotFound();
