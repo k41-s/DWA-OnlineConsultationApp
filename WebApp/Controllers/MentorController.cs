@@ -19,6 +19,7 @@ namespace WebApp.Controllers
         }
 
         // GET: Mentor
+        // Done to LO5 desired, so not by Type of Work
         public async Task<IActionResult> Index(string searchName, int? typeOfWorkId, int page = 1, int pageSize = 10)
         {
             var query = _context.Mentors
@@ -30,12 +31,11 @@ namespace WebApp.Controllers
             {
                 query = query.Where(m => m.Name.Contains(searchName) || m.Surname.Contains(searchName));
             }
+
             if (typeOfWorkId.HasValue && typeOfWorkId.Value > 0)
             {
                 query = query.Where(m => m.TypeOfWork.Id == typeOfWorkId.Value);
             }
-
-            ViewData["TypeOfWorkIds"] = await _context.TypeOfWorks.ToListAsync();
 
             var totalItems = await query.CountAsync();
 
@@ -58,6 +58,12 @@ namespace WebApp.Controllers
             ViewBag.TotalItems = totalItems;
             ViewBag.Page = page;
             ViewBag.PageSize = pageSize;
+
+            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                return PartialView("_MentorListPartial", mentorVMs);
+
+
+            ViewData["TypeOfWorkIds"] = await _context.TypeOfWorks.ToListAsync();
 
             return View(mentorVMs);
         }

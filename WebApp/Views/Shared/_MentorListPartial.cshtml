@@ -1,0 +1,29 @@
+﻿@model List<WebApp.ViewModels.MentorViewModel>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Surname</th>
+            <th>Type of Work</th>
+            <th>Areas</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var mentor in Model)
+        {
+            <tr>
+                <td>@mentor.Name</td>
+                <td>@mentor.Surname</td>
+                <td>@mentor.TypeOfWorkName</td>
+                <td>@string.Join(", ", mentor.AreaNames)</td>
+                <td>
+                    <a asp-action="Details" asp-route-id="@mentor.Id" class="btn btn-sm btn-info">Details</a>
+                    <a asp-action="Edit" asp-route-id="@mentor.Id" class="btn btn-sm btn-warning">Edit</a>
+                    <a asp-action="Delete" asp-route-id="@mentor.Id" class="btn btn-sm btn-danger">Delete</a>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
