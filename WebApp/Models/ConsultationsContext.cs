@@ -34,7 +34,7 @@ public partial class ConsultationsContext : DbContext
     {
         modelBuilder.Entity<Area>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Area__3214EC0729BCC1E1");
+            entity.HasKey(e => e.Id).HasName("PK__Area__3214EC0789D27FEF");
 
             entity.ToTable("Area");
 
@@ -43,7 +43,7 @@ public partial class ConsultationsContext : DbContext
 
         modelBuilder.Entity<Consultation>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Consulta__3214EC0798954498");
+            entity.HasKey(e => e.Id).HasName("PK__Consulta__3214EC074E0DAFAB");
 
             entity.ToTable("Consultation");
 
@@ -68,7 +68,7 @@ public partial class ConsultationsContext : DbContext
 
         modelBuilder.Entity<Log>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Log__3214EC077A8AF756");
+            entity.HasKey(e => e.Id).HasName("PK__Log__3214EC0795340637");
 
             entity.ToTable("Log");
 
@@ -78,7 +78,7 @@ public partial class ConsultationsContext : DbContext
 
         modelBuilder.Entity<Mentor>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Mentor__3214EC071E668209");
+            entity.HasKey(e => e.Id).HasName("PK__Mentor__3214EC07C432BF72");
 
             entity.ToTable("Mentor");
 
@@ -103,14 +103,14 @@ public partial class ConsultationsContext : DbContext
                         .HasConstraintName("FK__MentorAre__Mento__2F10007B"),
                     j =>
                     {
-                        j.HasKey("MentorId", "AreaId").HasName("PK__MentorAr__9230FC9CDAE11D88");
+                        j.HasKey("MentorId", "AreaId").HasName("PK__MentorAr__9230FC9C883ACD74");
                         j.ToTable("MentorArea");
                     });
         });
 
         modelBuilder.Entity<TypeOfWork>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__TypeOfWo__3214EC07F0E88F16");
+            entity.HasKey(e => e.Id).HasName("PK__TypeOfWo__3214EC079E74A190");
 
             entity.ToTable("TypeOfWork");
 
@@ -119,15 +119,16 @@ public partial class ConsultationsContext : DbContext
 
         modelBuilder.Entity<User>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__User__3214EC0764B1D0FF");
+            entity.HasKey(e => e.Id).HasName("PK__User__3214EC07D27BAB6A");
 
             entity.ToTable("User");
 
-            entity.HasIndex(e => e.Email, "UQ__User__A9D105349250D13B").IsUnique();
+            entity.HasIndex(e => e.Email, "UQ__User__A9D1053455653E2E").IsUnique();
 
             entity.Property(e => e.Email).HasMaxLength(255);
             entity.Property(e => e.Name).HasMaxLength(255);
             entity.Property(e => e.PasswordHash).HasMaxLength(255);
+            entity.Property(e => e.Phone).HasMaxLength(10);
             entity.Property(e => e.Role).HasMaxLength(50);
             entity.Property(e => e.Surname).HasMaxLength(255);
         });

@@ -7,7 +7,7 @@ using WebApp.ViewModels;
 
 namespace WebApp.Controllers
 {
-    [Authorize(Roles = "admin")]
+    [Authorize(Roles = "Admin")]
     public class AreaController : Controller
     {
         private readonly ConsultationsContext _context;

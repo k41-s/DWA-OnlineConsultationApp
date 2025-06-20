@@ -6,6 +6,8 @@ using WebApp.Models;
 using WebApp.ViewModels;
 using System.Text;
 using System.Security.Cryptography;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace WebApp.Controllers
 {
@@ -24,6 +26,61 @@ namespace WebApp.Controllers
             using var sha256 = SHA256.Create();
             byte[] bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
             return BitConverter.ToString(bytes).Replace("-", "").ToLowerInvariant();
+        }
+
+        [HttpGet]
+        [Authorize]
+        public async Task<IActionResult> Profile()
+        {
+            var userEmail = User.Identity.Name;
+
+            var admin = await _context.Users.FirstOrDefaultAsync(u => u.Email == userEmail);
+            
+            if (admin == null) 
+                return NotFound();
+
+            var vm = new ProfileViewModel
+            {
+                Email = admin.Email,
+                Name = admin.Name,
+                Surname = admin.Surname,
+                Phone = admin.Phone
+            };
+
+            ViewBag.IsAdmin = User.IsInRole("admin");
+
+            return View(vm);
+        }
+
+        [HttpPost]
+        [Authorize]
+        public async Task<IActionResult> UpdateProfile([FromBody] ProfileViewModel vm)
+        {
+            var email = User.Identity.Name;
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+
+            if (user == null) 
+                return NotFound();
+
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            user.Name = vm.Name;
+            user.Surname = vm.Surname;
+            user.Email = vm.Email;
+            user.Phone = vm.Phone;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+                return Json(new { success = true });
+            }
+            catch
+            {
+                return Json(new { success = false, message = "Could not update profile." });
+            }
         }
 
         [HttpGet]
@@ -46,7 +103,7 @@ namespace WebApp.Controllers
             var user = _context.Users
                 .FirstOrDefault(u => u.Email == model.Email && u.PasswordHash == pwdHash);
 
-            if (user == null || user.Role != "admin")
+            if (user == null || user.Role != "Admin")
             {
                 ModelState.AddModelError("", "Invalid credentials or not an administrator.");
                 return View(model);
