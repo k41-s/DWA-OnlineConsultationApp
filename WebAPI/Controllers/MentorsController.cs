@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion.Internal;
 using WebAPI.DTOs;
@@ -8,6 +9,7 @@ using WebAPI.Models;
 
 namespace WebAPI.Controllers
 {
+    [Authorize]
     [Route("api/mentors")]
     [ApiController]
     public class MentorsController : ControllerBase
@@ -93,6 +95,7 @@ namespace WebAPI.Controllers
 
         // POST api/mentors
         [HttpPost]
+        [Authorize(Roles = "Admin")]
         public async Task<ActionResult<MentorDTO>> CreateMentor([FromBody]MentorCreateDTO dto)
         {
             try
@@ -141,6 +144,7 @@ namespace WebAPI.Controllers
 
         // PUT api/mentors/5
         [HttpPut("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> UpdateMentor(int id, [FromBody]MentorCreateDTO dto)
         {
             if (id <= 0)
@@ -207,6 +211,7 @@ namespace WebAPI.Controllers
 
         // DELETE api/mentors/5
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> DeleteMentor(int id)
         {
             var mentor = await _context.Mentors.FindAsync(id);

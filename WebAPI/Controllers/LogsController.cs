@@ -1,9 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WebAPI.Models;
 
 namespace WebAPI.Controllers
 {
+    [Authorize]
     [Route("api/logs")]
     [ApiController]
     public class LogsController : ControllerBase
