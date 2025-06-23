@@ -24,7 +24,7 @@ namespace WebAPI.Controllers
             if (n <= 0) return BadRequest("N must be greater than 0.");
 
             var logs = await _context.Logs
-                .OrderByDescending(l => l.Timestamp)
+                .OrderBy(l => l.Timestamp)
                 .Take(n)
                 .ToListAsync();
 

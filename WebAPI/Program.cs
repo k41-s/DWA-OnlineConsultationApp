@@ -104,6 +104,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseRouting();
 
+app.UseStaticFiles();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
