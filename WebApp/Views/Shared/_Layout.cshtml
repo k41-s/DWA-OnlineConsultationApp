@@ -14,7 +14,7 @@
             <div class="container-fluid">
                 <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">WebApp</a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
-                        aria-expanded="false" aria-label="Toggle navigation">
+                aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
                 <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
@@ -25,20 +25,43 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Mentor" asp-action="Index">Mentor</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="TypeOfWork" asp-action="Index">Type of Work</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Area" asp-action="Index">Area</a>
-                        </li>
+                        @if(User.Identity?.IsAuthenticated ?? false)
+                        {
+                            if (User.IsInRole("Admin"))
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link text-dark" asp-area="" asp-controller="Mentor" asp-action="Index">Mentor</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link text-dark" asp-area="" asp-controller="TypeOfWork" asp-action="Index">Type of Work</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link text-dark" asp-area="" asp-controller="Area" asp-action="Index">Area</a>
+                                </li>
+                            }
+                            else
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link text-dark" asp-area="" asp-controller="UserView" asp-action="Index">Mentors</a>
+                                </li>
+                            }
+                        }
+                        else
+                        {
+                            // display other things here
+                        }
                     </ul>
                     <div style="justify-content: end;">
-                        @if (!User.Identity.IsAuthenticated)
+                        @if (!User.Identity?.IsAuthenticated ?? false)
                         {
-                            <a class="nav-link text-dark" style="border:solid black;" asp-area="" asp-controller="Account" asp-action="Login">Login</a>
+                            <ul class="navbar-nav flex-grow-1">
+                                <li class="nav-item">
+                                    <a class="btn btn-primary" style="background-color: #29517B !important; margin: 1vh;" asp-area="" asp-controller="Account" asp-action="Login">Login</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="btn btn-primary" style="background-color: #29517B !important; margin: 1vh;" asp-area="" asp-controller="Account" asp-action="Register">Register</a>
+                                </li>
+                            </ul>
                         }
                         else
                         {
@@ -47,10 +70,10 @@
                                     <span class="nav-link" style="color: black;">Logged in as <strong>@User.Identity.Name</strong></span>
                                 </li>
                                 <li class="nav-item">
-                                    <a class="nav-link text-dark" asp-area="" asp-controller="Account" asp-action="Profile">Profile</a>
+                                    <a class="btn btn-primary" style="background-color: #29517B !important; margin: 1vh;" asp-area="" asp-controller="Account" asp-action="Profile">Profile</a>
                                 </li>
                                 <li class="nav-item">
-                                    <a class="nav-link text-dark" style="border:1px solid black;" asp-area="" asp-controller="Account" asp-action="Logout">Logout</a>
+                                    <a class="btn btn-primary" style="background-color: #29517B !important; margin: 1vh;" style="border:1px solid black;" asp-area="" asp-controller="Account" asp-action="Logout">Logout</a>
                                 </li>
                             </ul>
                         }

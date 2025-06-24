@@ -25,6 +25,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
         options.SlidingExpiration = true;
         options.Cookie.IsEssential = true;
+        options.AccessDeniedPath = "/Home/Index"; // go back to index
         options.Events.OnRedirectToLogin = context =>
         {
             context.Response.Redirect(context.RedirectUri + "&reason=unauthorized");

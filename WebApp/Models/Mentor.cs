@@ -13,6 +13,8 @@ public partial class Mentor
 
     public int TypeOfWorkId { get; set; }
 
+    public string? ImagePath { get; set; }
+
     public virtual ICollection<Consultation> Consultations { get; set; } = new List<Consultation>();
 
     public virtual TypeOfWork TypeOfWork { get; set; } = null!;

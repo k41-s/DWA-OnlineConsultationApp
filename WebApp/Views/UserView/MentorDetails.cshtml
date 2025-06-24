@@ -1,0 +1,38 @@
+﻿@model WebApp.ViewModels.MentorViewModel
+
+@{
+    ViewData["Title"] = "Mentor Details";
+}
+
+<h2>@Model.Name @Model.Surname</h2>
+
+@if (!string.IsNullOrEmpty(Model.ImagePath))
+{
+    <div class="mb-3">
+        <img src="@Url.Content(Model.ImagePath)" alt="Mentor Image" class="img-thumbnail" style="max-width: 300px;" />
+    </div>
+}
+
+<div class="card">
+    <div class="card-body">
+        <div class="mb-4">
+            <h5 class="card-title">Type of Work</h5>
+            <p class="card-text">@Model.TypeOfWorkName</p>
+        </div>
+
+        <div class="mb-4">
+            <h5 class="card-title">Areas of Expertise</h5>
+            <div class="card-text">
+                @foreach (var area in Model.AreaNames)
+                {
+                    <span class="badge bg-primary me-2 mb-1">@area</span>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4">
+    <a asp-action="Index" class="btn btn-secondary me-2">Back to Mentors</a>
+    <a asp-action="BookConsultation" asp-route-id="@Model.Id" class="btn btn-success">Book Consultation</a>
+</div>

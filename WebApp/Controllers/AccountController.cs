@@ -103,7 +103,7 @@ namespace WebApp.Controllers
             var user = _context.Users
                 .FirstOrDefault(u => u.Email == model.Email && u.PasswordHash == pwdHash);
 
-            if (user == null || user.Role != "Admin")
+            if (user == null)
             {
                 ModelState.AddModelError("", "Invalid credentials or not an administrator.");
                 return View(model);
@@ -120,7 +120,52 @@ namespace WebApp.Controllers
 
             await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
 
-            return RedirectToAction("Index", "Mentor");
+            if (user.Role == "Admin")
+                return RedirectToAction("Index", "Mentor");
+            else
+                return RedirectToAction("Index", "UserView"); 
+        }
+
+
+        [HttpGet]
+        public IActionResult Register()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> RegisterAsync(RegisterViewModel vm)
+        {
+            if (!ModelState.IsValid)
+                return View(vm);
+
+            if (vm.Password != vm.RepeatPassword)
+            {
+                ModelState.AddModelError("", "Passwords do not match.");
+                return View(vm);
+            }
+
+            bool emailExists = await _context.Users.AnyAsync(u => u.Email == vm.Email);
+            if (emailExists)
+            {
+                ModelState.AddModelError("", "Email already in use.");
+                return View(vm);
+            }
+
+            var user = new User
+            {
+                Email = vm.Email,
+                PasswordHash = HashPassword(vm.Password),
+                Role = "User",
+                Name = vm.Name,
+                Surname = vm.Surname,
+                Phone = vm.Phone
+            };
+
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
+
+            return RedirectToAction("Login", "Account");
         }
 
         public async Task<IActionResult> Logout()

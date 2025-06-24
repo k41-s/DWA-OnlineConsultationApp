@@ -132,12 +132,37 @@ namespace WebApp.Controllers
 
             var areas = await _context.Areas.Where(a => vm.AreaIds.Contains(a.Id)).ToListAsync();
 
+            string? imagePath = null;
+
+            // Handle image upload manually from Request.Form.Files
+            if (Request.Form.Files.Count > 0)
+            {
+                IFormFile? imageFile = Request.Form.Files[0];
+                if (imageFile.Length > 0)
+                {
+                    var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
+                    if (!Directory.Exists(uploadsFolder))
+                        Directory.CreateDirectory(uploadsFolder);
+
+                    var uniqueFileName = Guid.NewGuid().ToString() + Path.GetExtension(imageFile.FileName);
+                    var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+                    using (var stream = new FileStream(filePath, FileMode.Create))
+                    {
+                        await imageFile.CopyToAsync(stream);
+                    }
+
+                    imagePath = "/uploads/" + uniqueFileName;
+                }
+            }
+
             var mentor = new Mentor
             {
                 Name = vm.Name,
                 Surname = vm.Surname,
                 TypeOfWorkId = vm.TypeOfWorkId,
-                Areas = areas
+                Areas = areas,
+                ImagePath = imagePath
             };
 
             try
@@ -157,6 +182,7 @@ namespace WebApp.Controllers
         }
 
         // GET: MentorsController/Edit/5
+        [HttpGet]
         public async Task<IActionResult> Edit(int id)
         {
             var mentor = await _context.Mentors
@@ -174,7 +200,8 @@ namespace WebApp.Controllers
                 Surname = mentor.Surname,
                 TypeOfWorkId = mentor.TypeOfWork.Id,
                 AreaIds = mentor.Areas.Select(a => a.Id).ToList(),
-                AreaNames = mentor.Areas.Select(a => a.Name).ToList()
+                AreaNames = mentor.Areas.Select(a => a.Name).ToList(),
+                ImagePath = mentor.ImagePath
             };
 
             ViewData["TypeOfWorkId"] = new SelectList(_context.TypeOfWorks, "Id", "Name");
@@ -224,6 +251,26 @@ namespace WebApp.Controllers
             mentor.Surname = vm.Surname;
             mentor.TypeOfWorkId = vm.TypeOfWorkId;
             mentor.Areas = await _context.Areas.Where(a => vm.AreaIds.Contains(a.Id)).ToListAsync();
+
+            // Handle image upload if provided
+            var imageFile = Request.Form.Files.FirstOrDefault();
+            if (imageFile != null && imageFile.Length > 0)
+            {
+                var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
+                if (!Directory.Exists(uploadsFolder))
+                    Directory.CreateDirectory(uploadsFolder);
+
+                var uniqueFileName = Guid.NewGuid().ToString() + Path.GetExtension(imageFile.FileName);
+                var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await imageFile.CopyToAsync(stream);
+                }
+
+                // Save relative path
+                mentor.ImagePath = "/uploads/" + uniqueFileName;
+            }
 
             try
             {

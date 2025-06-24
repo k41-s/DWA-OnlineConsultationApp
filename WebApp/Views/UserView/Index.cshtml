@@ -1,0 +1,80 @@
+﻿@model List<WebApp.ViewModels.MentorViewModel>
+@{
+    ViewData["Title"] = "Mentors";
+    var search = ViewData["CurrentSearch"] as string;
+    var typeOfWorkId = ViewData["CurrentTypeOfWorkId"] as int?;
+    var typeOfWorkList = ViewData["TypeOfWorkList"] as SelectList;
+    var currentPage = (int)ViewData["CurrentPage"];
+    var totalPages = (int)ViewData["TotalPages"];
+}
+
+<h2>Mentors</h2>
+
+<form method="get" asp-action="Index" class="row mb-3">
+    <div class="col-md-4">
+        <input name="search" value="@search" class="form-control" placeholder="Search by name or surname" />
+    </div>
+    <div class="col-md-4">
+        <select name="typeOfWorkId" class="form-select">
+            <option value="">-- Filter by Type of Work --</option>
+            @foreach (var item in typeOfWorkList)
+            {
+                <option value="@item.Value" selected="@(item.Value == typeOfWorkId?.ToString() ? "selected" : null)">
+                    @item.Text
+                </option>
+            }
+        </select>
+    </div>
+    <div class="col-md-4">
+        <button type="submit" class="btn btn-primary">Search</button>
+    </div>
+</form>
+
+<table class="table table-bordered table-hover">
+    <thead>
+        <tr>
+            <th>Image</th>
+            <th>Name</th>
+            <th>Surname</th>
+            <th>Type of Work</th>
+            <th>View Mentor Details</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var mentor in Model)
+        {
+            <tr>
+                <td>
+                    @if (!string.IsNullOrEmpty(mentor.ImagePath))
+                    {
+                        <img src="@Url.Content(mentor.ImagePath)" alt="Mentor Image" style="height: 60px;" />
+                    }
+                    else
+                    {
+                        <span>No image</span>
+                    }
+                </td>
+                <td>@mentor.Name</td>
+                <td>@mentor.Surname</td>
+                <td>@mentor.TypeOfWorkName</td>
+                <td>
+                    <a asp-action="MentorDetails" asp-route-id="@mentor.Id" class="btn btn-info btn-sm">Details</a>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<nav>
+    <ul class="pagination">
+        <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+            <a class="page-link" asp-action="Index" asp-route-search="@search" asp-route-typeOfWorkId="@typeOfWorkId" asp-route-page="@(currentPage - 1)">Previous</a>
+        </li>
+        <li class="page-item disabled">
+            <span class="page-link">Page @currentPage of @totalPages</span>
+        </li>
+        <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
+            <a class="page-link" asp-action="Index" asp-route-search="@search" asp-route-typeOfWorkId="@typeOfWorkId" asp-route-page="@(currentPage + 1)">Next</a>
+        </li>
+    </ul>
+</nav>

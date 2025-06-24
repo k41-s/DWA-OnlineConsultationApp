@@ -21,6 +21,9 @@ namespace WebApp.ViewModels
         [Display(Name = "Type of Work")]
         public string TypeOfWorkName { get; set; } = string.Empty;
 
+        [Display(Name = "Image Path")]
+        public string? ImagePath { get; set; } = string.Empty;
+
         [Required(ErrorMessage = "Areas are required")]
         [Display(Name = "Selected Areas")]
         public List<int> AreaIds { get; set; } = new();
