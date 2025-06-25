@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using WebApp.Models;
 using WebApp.ViewModels;
 
@@ -66,6 +67,21 @@ namespace WebApp.Controllers
 
         public async Task<IActionResult> MentorDetails(int id)
         {
+            if(!User.Identity?.IsAuthenticated ?? true)
+                return RedirectToAction("Login", "Account");
+
+            string? email = User.Identity?.Name;
+
+            if (string.IsNullOrEmpty(email))
+                return Unauthorized();
+
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+
+            if (user == null)
+                return Unauthorized();
+
+            int userId = user.Id;
+
             var mentor = await _context.Mentors
                 .Include(m => m.TypeOfWork)
                 .Include(m => m.Areas)
@@ -73,6 +89,9 @@ namespace WebApp.Controllers
 
             if (mentor == null)
                 return NotFound();
+
+            var hasBooked = await _context.Consultations
+                .AnyAsync(c => c.MentorId == id && c.UserId == userId);
 
             var vm = new MentorViewModel
             {
@@ -86,6 +105,7 @@ namespace WebApp.Controllers
                 AreaNames = mentor.Areas.Select(a => a.Name).ToList()
             };
 
+            ViewData["HasBooked"] = hasBooked;
             return View(vm);
         }
 
@@ -116,8 +136,19 @@ namespace WebApp.Controllers
                 return View(model);
 
             var userEmail = User.Identity?.Name;
+
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == userEmail);
-            if (user == null) return Unauthorized();
+
+            if (user == null) 
+                return Unauthorized();
+
+            // Check if already booked
+            var alreadyBooked = await _context.Consultations
+                .AnyAsync(c => c.MentorId == model.MentorId && c.UserId == user.Id);
+
+            if (alreadyBooked)
+                return RedirectToAction("MentorDetails", new { id = model.MentorId }); // optionally flash a message
+
 
             var consultation = new Consultation
             {
@@ -131,11 +162,7 @@ namespace WebApp.Controllers
             _context.Consultations.Add(consultation);
             await _context.SaveChangesAsync();
 
-            return RedirectToAction("MentorDetails", new { id = model.MentorId });
+            return RedirectToAction("MyConsultations", "ConsultationView");
         }
-
-        // Hide book button if already booked
-        // make a page to view booked consultations
-        // implement 7. admin view of users and their bookings
     }
 }

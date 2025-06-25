@@ -1,0 +1,51 @@
+﻿@model List<WebApp.ViewModels.UserWithConsultationsViewModel>
+
+@{
+    ViewData["Title"] = "Users and Their Consultations";
+}
+
+<h2>Users and Their Booked Consultations</h2>
+
+@foreach (var vm in Model)
+{
+    <!-- Only User can request/book consultation -->
+    @if(vm.Role == "User")
+    {
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <strong>@vm.Name @vm.Surname</strong> (<em>@vm.Email</em>)
+            </div>
+            <div class="card-body">
+                @if (!vm.Consultations.Any())
+                {
+                    <p class="text-muted">No consultations booked.</p>
+                }
+                else
+                {
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Mentor</th>
+                                <th>Requested At</th>
+                                <th>Status</th>
+                                <th>Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var c in vm.Consultations)
+                            {
+                                <tr>
+                                    <td>@c.MentorName @c.MentorSurname</td>
+                                    <td>@c.RequestedAt.ToString("g")</td>
+                                    <td>@c.Status</td>
+                                    <td>@c.Notes</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+    }
+    
+}

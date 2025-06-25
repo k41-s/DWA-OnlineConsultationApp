@@ -34,5 +34,13 @@
 
 <div class="mt-4">
     <a asp-action="Index" class="btn btn-secondary me-2">Back to Mentors</a>
-    <a asp-action="BookConsultation" asp-route-id="@Model.Id" class="btn btn-success">Book Consultation</a>
+
+    @if (!(ViewData["HasBooked"] as bool? ?? false))
+    {
+        <a asp-action="BookConsultation" asp-route-id="@Model.Id" class="btn btn-success">Book Consultation</a>
+    }
+    else
+    {
+        <button class="btn btn-outline-success" disabled>You already booked this mentor</button>
+    }
 </div>
