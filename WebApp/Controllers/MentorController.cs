@@ -23,21 +23,26 @@ namespace WebApp.Controllers
         }
 
         // GET: Mentor
-        public async Task<IActionResult> Index(string searchName, int? typeOfWorkId, int page = 1, int pageSize = 10)
+        public async Task<IActionResult> Index(
+            string name, 
+            int? typeOfWorkId, 
+            int page = 1, 
+            int pageSize = 10)
         {
             var client = _clientFactory.CreateClient("ApiClient");
 
             var queryParams = new List<string>();
-            if (!string.IsNullOrEmpty(searchName))
-                queryParams.Add($"searchName={Uri.EscapeDataString(searchName)}");
+
+            if (!string.IsNullOrEmpty(name))
+                queryParams.Add($"name={Uri.EscapeDataString(name)}");
 
             if (typeOfWorkId.HasValue && typeOfWorkId.Value > 0)
-                queryParams.Add($"typeOfWorkId={typeOfWorkId.Value}");
+                queryParams.Add($"typeOfWorkId={typeOfWorkId}");
 
             queryParams.Add($"page={page}");
             queryParams.Add($"pageSize={pageSize}");
 
-            var url = "/api/mentors/";
+            var url = "/api/mentors/search";
             if (queryParams.Count > 0)
                 url += "?" + string.Join("&", queryParams);
 
@@ -61,7 +66,21 @@ namespace WebApp.Controllers
 
             ViewBag.Page = page;
             ViewBag.PageSize = pageSize;
-            ViewBag.TotalItems = mentorVMs.Count();
+            int totalItems = 0;
+
+
+
+            if (response.Headers.TryGetValues("X-Total-Count", out var totalValues))
+            {
+                int.TryParse(totalValues.FirstOrDefault(), out totalItems);
+            }
+
+            ViewBag.TotalItems = totalItems;
+
+            ViewData["CurrentSearch"] = name;
+            ViewData["CurrentTypeOfWorkId"] = typeOfWorkId;
+            ViewData["CurrentPage"] = page;
+            ViewData["TotalPages"] = totalItems;
 
             if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
                 return PartialView("_MentorListPartial", mentorVMs);
@@ -343,7 +362,7 @@ namespace WebApp.Controllers
             var typeOfWorks = _mapper.Map<List<TypeOfWorkViewModel>>(typeOfWorkDtos);
             var areas = _mapper.Map<List<AreaViewModel>>(areaDtos);
 
-            ViewData["TypeOfWorkId"] = new SelectList(typeOfWorks, "Id", "Name");
+            ViewData["TypeOfWorkList"] = new SelectList(typeOfWorks, "Id", "Name");
             ViewData["AreaIds"] = new MultiSelectList(areas, "Id", "Name");
         }
     }

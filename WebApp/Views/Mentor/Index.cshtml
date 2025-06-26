@@ -1,136 +1,96 @@
-﻿@model IEnumerable<WebApp.ViewModels.MentorViewModel>
+﻿@model List<WebApp.ViewModels.MentorViewModel>
 
 @{
     ViewData["Title"] = "Mentors List";
-    int currentPage = ViewBag.Page;
-    int pageSize = ViewBag.PageSize;
-    int totalItems = ViewBag.TotalItems;
-    int totalPages = (int)Math.Ceiling((double)totalItems / pageSize);
+    var name = ViewData["CurrentSearch"] as string;
+    var typeOfWorkId = ViewData["CurrentTypeOfWorkId"] as int?;
+    var typeOfWorkList = ViewData["TypeOfWorkList"] as SelectList;
+    var currentPage = (int)ViewData["CurrentPage"];
+    var totalPages = (int)ViewData["TotalPages"];
 }
 
 <h2>@ViewData["Title"]</h2>
 
 <div class="btn-group mb-3" role="group" aria-label="Mentor CRUD navigation">
-    <!-- Create new mentor-->
     <a asp-action="Create" class="btn btn-success">Add New Mentor</a>
 </div>
 
-<form id="searchForm" class="form-inline mb-3">
-    <div class="form-group mr-2">
-        <input type="text" name="searchName" id="searchName" value="@Context.Request.Query["searchName"]" placeholder="Search by name" class="form-control" />
+<form method="get" asp-action="Index" class="row mb-3">
+    <div class="col-md-4">
+        <input type="text" name="name" value="@name" class="form-control" placeholder="Search by name" />
     </div>
-
-    <div class="form-group mr-2">
-        <select name="typeOfWorkId" id="typeOfWorkId" class="form-control">
+    <div class="col-md-4">
+        <select name="typeOfWorkId" class="form-select">
             <option value="0">-- All Types of Work --</option>
-            @if (ViewData["TypeOfWorkIds"] is List<WebApp.ViewModels.TypeOfWorkViewModel> typeList)
+            @foreach (var type in typeOfWorkList)
             {
-                var selectedId = Context.Request.Query["typeOfWorkId"].ToString();
-
-                foreach (var type in typeList)
-                {
-                    var selected = selectedId == type.Id.ToString() ? "selected" : "";
-                    @:<option value="@type.Id" @selected>@type.Name</option>
-                }
+                <option value="@type.Value" selected="@(type.Value == typeOfWorkId?.ToString() ? "selected" : null)">
+                    @type.Text
+                </option>
             }
         </select>
     </div>
-    <button type="submit" class="btn btn-primary">Search</button>
+    <div class="col-md-4">
+        <button type="submit" class="btn btn-primary">Search</button>
+    </div>
 </form>
 
+<table class="table table-bordered table-hover">
+    <thead>
+        <tr>
+            <th>Image</th>
+            <th>Name</th>
+            <th>Surname</th>
+            <th>Type of Work</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var mentor in Model)
+        {
+            <tr>
+                <td>
+                    @if (!string.IsNullOrEmpty(mentor.ImagePath))
+                    {
+                        <img src="@Url.Content(mentor.ImagePath)" alt="Mentor Image" style="height: 60px;" />
+                    }
+                    else
+                    {
+                        <span>No image</span>
+                    }
+                </td>
+                <td>@mentor.Name</td>
+                <td>@mentor.Surname</td>
+                <td>@mentor.TypeOfWorkName</td>
+                <td>
+                    <a asp-action="Edit" asp-route-id="@mentor.Id" class="btn btn-warning btn-sm">Edit</a>
+                    <a asp-action="Delete" asp-route-id="@mentor.Id" class="btn btn-danger btn-sm">Delete</a>
+                    <a asp-action="Details" asp-route-id="@mentor.Id" class="btn btn-info btn-sm">Details</a>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
 
-<div id="mentorList">
-    @await Html.PartialAsync("_MentorListPartial", Model)
-</div>
-
-<!-- Pagination controls -->
-<nav aria-label="Mentor pagination" class="mt-3">
-    <ul class="pagination" id="pagination">
-        <!-- Pagination buttons will be inserted via JS -->
+<!-- Pagination -->
+<nav>
+    <ul class="pagination">
+        <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+            <a class="page-link"
+               asp-action="Index"
+               asp-route-searchName="@name"
+               asp-route-typeOfWorkId="@typeOfWorkId"
+               asp-route-page="@(currentPage - 1)">Previous</a>
+        </li>
+        <li class="page-item disabled">
+            <span class="page-link">Page @currentPage of @totalPages</span>
+        </li>
+        <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
+            <a class="page-link"
+               asp-action="Index"
+               asp-route-searchName="@name"
+               asp-route-typeOfWorkId="@typeOfWorkId"
+               asp-route-page="@(currentPage + 1)">Next</a>
+        </li>
     </ul>
 </nav>
-
-@section Scripts {
-    <script>
-        const pageSize = @pageSize;
-        let page = @currentPage;
-        let totalPages = @totalPages;
-
-        // Keep track of current search/filter inputs
-        function getFilters() {
-            return {
-                searchName: document.getElementById("searchName")?.value || "",
-                typeOfWorkId: document.getElementById("typeOfWorkId")?.value || "0"
-            };
-        }
-
-        // Load a given page, sending current search and filter as query params
-        function loadPage(pageNum) {
-            currentPage = pageNum;
-
-            const filters = getFilters();
-
-            // Build query string with page and filters
-            const params = new URLSearchParams({
-                page: pageNum,
-                searchName: filters.searchName,
-                typeOfWorkId: filters.typeOfWorkId
-            });
-
-            fetch(`/Mentor/Index?${params.toString()}`, {
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            })
-            .then(res => res.text())
-            .then(html => {
-                document.getElementById("mentorList").innerHTML = html;
-                updatePagination(currentPage);
-            });
-        }
-        
-        // Update pagination UI
-        function updatePagination(currentPage) {
-            const pagination = document.getElementById("pagination");
-            pagination.innerHTML = "";
-
-            const createPageItem = (pageNum, label, isActive = false, isDisabled = false) => {
-                const li = document.createElement("li");
-                li.className = `page-item ${isActive ? "active" : ""} ${isDisabled ? "disabled" : ""}`;
-                const a = document.createElement("a");
-                a.className = "page-link";
-                a.href = "#";
-                a.textContent = label;
-                a.onclick = (e) => {
-                    e.preventDefault();
-                    if (!isDisabled && currentPage !== pageNum) {
-                        loadPage(pageNum);
-                    }
-                };
-                li.appendChild(a);
-                return li;
-            };
-
-            pagination.appendChild(createPageItem(currentPage - 1, "Previous", false, currentPage <= 1));
-
-            for (let i = Math.max(1, currentPage - 2); i <= Math.min(totalPages, currentPage + 2); i++) {
-                pagination.appendChild(createPageItem(i, i, i === currentPage));
-            }
-
-            pagination.appendChild(createPageItem(currentPage + 1, "Next", false, currentPage >= totalPages));
-        }
-
-        // Attach event listener to search form to trigger AJAX search with filters
-        document.addEventListener("DOMContentLoaded", () => {
-            updatePagination(page);
-
-            const searchForm = document.getElementById("searchForm");
-            if (searchForm) {
-                searchForm.addEventListener("submit", function(e) {
-                    e.preventDefault();
-                    loadPage(1);  // Search always resets to page 1
-                });
-            }
-        });
-    </script>
-}

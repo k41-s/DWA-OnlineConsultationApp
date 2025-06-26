@@ -180,7 +180,10 @@ namespace WebAPI.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> DeleteMentor(int id)
         {
-            var mentor = await _context.Mentors.FindAsync(id);
+            var mentor = await _context.Mentors
+                .Include(m => m.Areas)
+                .FirstOrDefaultAsync(m => m.Id == id);
+
             if (mentor == null)
             {
                 await AddLogAsync("Warning", $"Mentor with id={id} not found for deletion.");
@@ -189,6 +192,10 @@ namespace WebAPI.Controllers
 
             try
             {
+                // remove foreign keys first
+                mentor.Areas.Clear();
+                await _context.SaveChangesAsync();
+
                 _context.Mentors.Remove(mentor);
                 await _context.SaveChangesAsync();
 
@@ -206,6 +213,7 @@ namespace WebAPI.Controllers
         [HttpGet("search")]
         public async Task<ActionResult<IEnumerable<MentorDTO>>> SearchMentors(
             string? name = null,
+            int? typeOfWorkId = null,
             int page = 1,
             int pageSize = 10)
         {
@@ -229,6 +237,11 @@ namespace WebAPI.Controllers
                         (m.Name != null && m.Name.ToLower().Contains(nameLower)) ||
                         (m.Surname != null && m.Surname.ToLower().Contains(nameLower))
                     );
+                }
+
+                if (typeOfWorkId.HasValue && typeOfWorkId > 0)
+                {
+                    mentorsQuery = mentorsQuery.Where(m => m.TypeOfWorkId == typeOfWorkId.Value);
                 }
 
                 var total = await mentorsQuery.CountAsync();

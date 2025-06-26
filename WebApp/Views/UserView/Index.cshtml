@@ -1,7 +1,7 @@
 ﻿@model List<WebApp.ViewModels.MentorViewModel>
 @{
     ViewData["Title"] = "Mentors";
-    var search = ViewData["CurrentSearch"] as string;
+    var name = ViewData["CurrentSearch"] as string;
     var typeOfWorkId = ViewData["CurrentTypeOfWorkId"] as int?;
     var typeOfWorkList = ViewData["TypeOfWorkList"] as SelectList;
     var currentPage = (int)ViewData["CurrentPage"];
@@ -12,7 +12,7 @@
 
 <form method="get" asp-action="Index" class="row mb-3">
     <div class="col-md-4">
-        <input name="search" value="@search" class="form-control" placeholder="Search by name or surname" />
+        <input name="name" value="@name" class="form-control" placeholder="Search by name or surname" />
     </div>
     <div class="col-md-4">
         <select name="typeOfWorkId" class="form-select">
@@ -68,13 +68,13 @@
 <nav>
     <ul class="pagination">
         <li class="page-item @(currentPage == 1 ? "disabled" : "")">
-            <a class="page-link" asp-action="Index" asp-route-search="@search" asp-route-typeOfWorkId="@typeOfWorkId" asp-route-page="@(currentPage - 1)">Previous</a>
+            <a class="page-link" asp-action="Index" asp-route-search="@name" asp-route-typeOfWorkId="@typeOfWorkId" asp-route-page="@(currentPage - 1)">Previous</a>
         </li>
         <li class="page-item disabled">
             <span class="page-link">Page @currentPage of @totalPages</span>
         </li>
         <li class="page-item @(currentPage == totalPages ? "disabled" : "")">
-            <a class="page-link" asp-action="Index" asp-route-search="@search" asp-route-typeOfWorkId="@typeOfWorkId" asp-route-page="@(currentPage + 1)">Next</a>
+            <a class="page-link" asp-action="Index" asp-route-search="@name" asp-route-typeOfWorkId="@typeOfWorkId" asp-route-page="@(currentPage + 1)">Next</a>
         </li>
     </ul>
 </nav>

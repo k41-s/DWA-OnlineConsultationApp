@@ -40,6 +40,9 @@ namespace WebApp.Controllers
             if (!string.IsNullOrEmpty(name))
                 queryParams.Add($"name={Uri.EscapeDataString(name)}");
 
+            if (typeOfWorkId.HasValue && typeOfWorkId > 0)
+                queryParams.Add($"typeOfWorkId={typeOfWorkId}");
+
             queryParams.Add($"page={page}");
             queryParams.Add($"pageSize={PageSize}");
 
