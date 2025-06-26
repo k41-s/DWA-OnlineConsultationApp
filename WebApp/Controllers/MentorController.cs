@@ -59,6 +59,10 @@ namespace WebApp.Controllers
 
             await PopulateDropdownsAsync();
 
+            ViewBag.Page = page;
+            ViewBag.PageSize = pageSize;
+            ViewBag.TotalItems = mentorVMs.Count();
+
             if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
                 return PartialView("_MentorListPartial", mentorVMs);
 
@@ -285,10 +289,32 @@ namespace WebApp.Controllers
             {
                 return RedirectToAction(nameof(Index));
             }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                ModelState.AddModelError("", "Cannot delete this Mentor due to a conflict");
+
+                var reloadResponse = await client.GetAsync($"/api/mentors/{id}");
+
+                if (!reloadResponse.IsSuccessStatusCode)
+                    return NotFound();
+
+                var dto = await reloadResponse.Content.ReadFromJsonAsync<MentorDTO>();
+                var vm = _mapper.Map<MentorViewModel>(dto);
+
+                return View("Delete", vm);
+            }
             else
             {
-                ModelState.AddModelError("", "Failed to delete mentor via API.");
-                return View();
+                ModelState.AddModelError("", "Failed to delete Mentor via API.");
+
+                var reloadResponse = await client.GetAsync($"/api/mentors/{id}");
+                if (!reloadResponse.IsSuccessStatusCode)
+                    return NotFound();
+
+                var dto = await reloadResponse.Content.ReadFromJsonAsync<MentorDTO>();
+                var vm = _mapper.Map<MentorViewModel>(dto);
+
+                return View("Delete", vm);
             }
         }
 
@@ -304,7 +330,7 @@ namespace WebApp.Controllers
             }
 
             var towResponse = await client.GetAsync("/api/typeOfWork");
-            var areasResponse = await client.GetAsync("/api/area");
+            var areasResponse = await client.GetAsync("/api/areas");
 
             var typeOfWorkDtos = towResponse.IsSuccessStatusCode
                 ? await towResponse.Content.ReadFromJsonAsync<List<TypeOfWorkDTO>>()

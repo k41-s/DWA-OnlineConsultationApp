@@ -102,6 +102,7 @@ namespace WebApp.Controllers
 
             var dto = await response.Content.ReadFromJsonAsync<AreaDTO>();
             var vm = _mapper.Map<AreaViewModel>(dto);
+
             return View(vm);
         }
 
@@ -113,10 +114,35 @@ namespace WebApp.Controllers
             var response = await _client.DeleteAsync($"api/areas/{id}");
 
             if (response.IsSuccessStatusCode)
+            {
                 return RedirectToAction(nameof(Index));
+            }
+            else if(response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                ModelState.AddModelError("", "Failed to delete area (might be linked to a mentor).");
 
-            ModelState.AddModelError("", "Failed to delete area (might be linked to a mentor).");
-            return View();
+                var reloadResponse = await _client.GetAsync($"/api/areas/{id}");
+
+                if (!reloadResponse.IsSuccessStatusCode)
+                    return NotFound();
+
+                var dto = await reloadResponse.Content.ReadFromJsonAsync<AreaDTO>();
+                var vm = _mapper.Map<AreaViewModel>(dto);
+
+                return View("Delete", vm);
+            }
+            else
+            {
+                ModelState.AddModelError("", "Failed to delete Area via API.");
+                var reloadResponse = await _client.GetAsync($"/api/areas/{id}");
+                if (!reloadResponse.IsSuccessStatusCode)
+                    return NotFound();
+
+                var dto = await reloadResponse.Content.ReadFromJsonAsync<AreaDTO>();
+                var vm = _mapper.Map<AreaViewModel>(dto);
+
+                return View("Delete", vm);
+            }
         }
     }
 }

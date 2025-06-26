@@ -47,8 +47,9 @@ namespace WebAPI.Profiles
             CreateMap<ConsultationDTO, Consultation>();
 
             CreateMap<ConsultationCreateDTO, Consultation>();
+            CreateMap<ConsultationInfoDTO, Consultation>().ReverseMap();
 
-
+            CreateMap<UserWithConsultationsDTO, User>().ReverseMap();
         }
     }
 }
