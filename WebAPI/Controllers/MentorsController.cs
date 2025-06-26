@@ -5,8 +5,6 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion.Internal;
 using WebAPI.DTOs;
 using WebAPI.Models;
 
-// For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
-
 namespace WebAPI.Controllers
 {
     [Authorize]
@@ -214,7 +212,10 @@ namespace WebAPI.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> DeleteMentor(int id)
         {
-            var mentor = await _context.Mentors.FindAsync(id);
+            var mentor = await _context.Mentors
+                .Include(m => m.Areas)
+                .FirstOrDefaultAsync(m => m.Id == id);
+
             if (mentor == null)
             {
                 await AddLogAsync("Warning", $"Mentor with id={id} not found for deletion.");
@@ -223,6 +224,9 @@ namespace WebAPI.Controllers
 
             try
             {
+                mentor.Areas.Clear();
+                await _context.SaveChangesAsync();
+
                 _context.Mentors.Remove(mentor);
                 await _context.SaveChangesAsync();
 

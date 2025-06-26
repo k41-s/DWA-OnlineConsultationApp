@@ -320,14 +320,21 @@ namespace WebApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            var mentor = await _context.Mentors.FindAsync(id);
+            var mentor = await _context.Mentors
+                .Include(m => m.Areas)
+                .FirstOrDefaultAsync(m => m.Id == id);
+
             if (mentor == null) 
                 return NotFound();
 
             try
             {
+                mentor.Areas.Clear();
+                await _context.SaveChangesAsync();
+
                 _context.Mentors.Remove(mentor);
                 await _context.SaveChangesAsync();
+
                 return RedirectToAction(nameof(Index));
             }
             catch
