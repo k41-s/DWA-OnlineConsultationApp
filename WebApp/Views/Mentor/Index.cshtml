@@ -23,7 +23,7 @@
     <div class="form-group mr-2">
         <select name="typeOfWorkId" id="typeOfWorkId" class="form-control">
             <option value="0">-- All Types of Work --</option>
-            @if (ViewData["TypeOfWorkIds"] is List<WebApp.Models.TypeOfWork> typeList)
+            @if (ViewData["TypeOfWorkIds"] is List<WebApp.ViewModels.TypeOfWorkViewModel> typeList)
             {
                 var selectedId = Context.Request.Query["typeOfWorkId"].ToString();
 

@@ -1,9 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using AutoMapper;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using WebAPI.DTOs;
+using OnlineConsultationApp.core.DTOs;
 using WebAPI.Models;
-
-// For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
 namespace WebAPI.Controllers
 {
@@ -12,25 +11,21 @@ namespace WebAPI.Controllers
     public class TypeOfWorkController : ControllerBase
     {
         private readonly ConsultationsContext _context;
+        private readonly IMapper _mapper;
 
-        public TypeOfWorkController(ConsultationsContext context)
+        public TypeOfWorkController(ConsultationsContext context, IMapper mapper)
         {
             _context = context;
+            _mapper = mapper;
         }
 
         // GET: api/typeOfWork
         [HttpGet]
         public async Task<ActionResult<IEnumerable<TypeOfWorkDTO>>> GetAll()
         {
-            var types = await _context.TypeOfWorks
-                .Select(t => new TypeOfWorkDTO
-                {
-                    Id = t.Id,
-                    Name = t.Name
-                })
-                .ToListAsync();
-
-            return Ok(types);
+            var types = await _context.TypeOfWorks.ToListAsync();
+            var dtos = _mapper.Map<List<TypeOfWorkDTO>>(types);
+            return Ok(dtos);
         }
 
         // GET api/typeOfWork/5
@@ -41,18 +36,14 @@ namespace WebAPI.Controllers
             {
                 var type = await _context.TypeOfWorks.FindAsync(id);
 
-                if (type == null) 
+                if (type == null)
                     return NotFound();
 
-                var dto = new TypeOfWorkDTO
-                {
-                    Id = type.Id,
-                    Name = type.Name
-                };
+                var dto = _mapper.Map<TypeOfWorkDTO>(type);
 
                 return Ok(dto);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return StatusCode(500, "An unexpected error occurred while retrieving the type of work.");
             }
@@ -60,25 +51,18 @@ namespace WebAPI.Controllers
 
         // POST api/typeOfWork
         [HttpPost]
-        public async Task<ActionResult<TypeOfWorkDTO>> Post([FromBody]TypeOfWorkCreateDTO dto)
+        public async Task<ActionResult<TypeOfWorkDTO>> Post([FromBody] TypeOfWorkCreateDTO dto)
         {
             try
             {
-                var type = new TypeOfWork
-                {
-                    Name = dto.Name
-                };
+                var type = _mapper.Map<TypeOfWork>(dto);
 
                 _context.TypeOfWorks.Add(type);
                 await _context.SaveChangesAsync();
 
-                var reaultDto = new TypeOfWorkDTO
-                {
-                    Id = type.Id,
-                    Name = type.Name
-                };
+                var resultDto = _mapper.Map<TypeOfWorkDTO>(type);
 
-                return CreatedAtAction(nameof(Get), new { id = type.Id }, reaultDto);
+                return CreatedAtAction(nameof(Get), new { id = type.Id }, resultDto);
             }
             catch (Exception ex)
             {
@@ -88,19 +72,19 @@ namespace WebAPI.Controllers
 
         // PUT api/typeOfWork/5
         [HttpPut("{id}")]
-        public async Task<IActionResult> Put(int id, [FromBody]TypeOfWorkCreateDTO dto)
+        public async Task<IActionResult> Put(int id, [FromBody] TypeOfWorkCreateDTO dto)
         {
             try
             {
-                if (id <= 0) 
-                return BadRequest("Invalid id provided");
+                if (id <= 0)
+                    return BadRequest("Invalid id provided");
 
                 var type = await _context.TypeOfWorks.FindAsync(id);
 
                 if (type == null)
                     return NotFound();
 
-                type.Name = dto.Name;
+                _mapper.Map(dto, type);
 
                 _context.Entry(type).State = EntityState.Modified;
 
@@ -109,11 +93,11 @@ namespace WebAPI.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!_context.TypeOfWorks.Any(e => e.Id == id)) 
+                if (!_context.TypeOfWorks.Any(e => e.Id == id))
                     return NotFound();
                 else throw;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return StatusCode(500, "Update failed.");
             }

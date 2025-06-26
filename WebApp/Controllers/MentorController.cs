@@ -1,9 +1,11 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
+﻿using System.Net.Http.Headers;
+using System.Net.Http;
+using System.Net.Http.Json;
+using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore;
-using WebApp.Models;
+using OnlineConsultationApp.core.DTOs;
 using WebApp.ViewModels;
 
 namespace WebApp.Controllers
@@ -11,59 +13,54 @@ namespace WebApp.Controllers
     [Authorize(Roles = "Admin")]
     public class MentorController : Controller
     {
-        private readonly ConsultationsContext _context;
+        private readonly IHttpClientFactory _clientFactory;
+        private readonly IMapper _mapper;
 
-        public MentorController(ConsultationsContext context)
+        public MentorController(IHttpClientFactory clientFactory, IMapper mapper)
         {
-            _context = context;
+            _clientFactory = clientFactory;
+            _mapper = mapper;
         }
 
         // GET: Mentor
-        // Done to LO5 desired, so not by Type of Work
         public async Task<IActionResult> Index(string searchName, int? typeOfWorkId, int page = 1, int pageSize = 10)
         {
-            var query = _context.Mentors
-                .Include(m => m.Areas)
-                .Include(m => m.TypeOfWork)
-                .AsQueryable();
+            var client = _clientFactory.CreateClient("ApiClient");
 
+            var queryParams = new List<string>();
             if (!string.IsNullOrEmpty(searchName))
-            {
-                query = query.Where(m => m.Name.Contains(searchName) || m.Surname.Contains(searchName));
-            }
+                queryParams.Add($"searchName={Uri.EscapeDataString(searchName)}");
 
             if (typeOfWorkId.HasValue && typeOfWorkId.Value > 0)
+                queryParams.Add($"typeOfWorkId={typeOfWorkId.Value}");
+
+            queryParams.Add($"page={page}");
+            queryParams.Add($"pageSize={pageSize}");
+
+            var url = "/api/mentors/";
+            if (queryParams.Count > 0)
+                url += "?" + string.Join("&", queryParams);
+
+            var token = User.Claims.FirstOrDefault(c => c.Type == "AccessToken")?.Value;
+
+            if (!string.IsNullOrEmpty(token))
             {
-                query = query.Where(m => m.TypeOfWork.Id == typeOfWorkId.Value);
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
-            var totalItems = await query.CountAsync();
-
-            var mentors = await query
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
-
-            var mentorVMs = mentors.Select(m => new MentorViewModel
+            var response = await client.GetAsync(url);
+            if (!response.IsSuccessStatusCode)
             {
-                Id = m.Id,
-                Name = m.Name,
-                Surname = m.Surname,
-                TypeOfWorkId = m.TypeOfWork.Id,
-                TypeOfWorkName = m.TypeOfWork.Name,
-                AreaIds = m.Areas.Select(a => a.Id).ToList(),
-                AreaNames = m.Areas.Select(a => a.Name).ToList()
-            }).ToList();
+                return View(new List<MentorViewModel>());
+            }
 
-            ViewBag.TotalItems = totalItems;
-            ViewBag.Page = page;
-            ViewBag.PageSize = pageSize;
+            var mentorDtos = await response.Content.ReadFromJsonAsync<List<MentorDTO>>();
+            var mentorVMs = _mapper.Map<List<MentorViewModel>>(mentorDtos);
+
+            await PopulateDropdownsAsync();
 
             if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
                 return PartialView("_MentorListPartial", mentorVMs);
-
-
-            ViewData["TypeOfWorkIds"] = await _context.TypeOfWorks.ToListAsync();
 
             return View(mentorVMs);
         }
@@ -71,33 +68,31 @@ namespace WebApp.Controllers
         // GET: Mentor/Details/5
         public async Task<IActionResult> Details(int id)
         {
-            var mentor = await _context.Mentors
-                .Include(m => m.Areas)
-                .Include(m => m.TypeOfWork)
-                .FirstOrDefaultAsync(m => m.Id == id);
+            var client = _clientFactory.CreateClient("ApiClient");
 
-            if (mentor == null) 
+            var token = User.Claims.FirstOrDefault(c => c.Type == "AccessToken")?.Value;
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var response = await client.GetAsync($"/api/mentors/{id}");
+
+            if (!response.IsSuccessStatusCode)
                 return NotFound();
 
-            var vm = new MentorViewModel
-            {
-                Id = mentor.Id,
-                Name = mentor.Name,
-                Surname = mentor.Surname,
-                TypeOfWorkId = mentor.TypeOfWork.Id,
-                TypeOfWorkName = mentor.TypeOfWork.Name,
-                AreaIds = mentor.Areas.Select(a => a.Id).ToList(),
-                AreaNames = mentor.Areas.Select(a => a.Name).ToList()
-            };
+            var mentorDto = await response.Content.ReadFromJsonAsync<MentorDTO>();
+            var vm = _mapper.Map<MentorViewModel>(mentorDto);
 
             return View(vm);
         }
 
         // GET: Mentors/Create
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {
-            ViewData["TypeOfWorkId"] = new SelectList(_context.TypeOfWorks, "Id", "Name");
-            ViewData["AreaIds"] = new MultiSelectList(_context.Areas, "Id", "Name");
+            await PopulateDropdownsAsync();
+
             return View();
         }
 
@@ -108,36 +103,24 @@ namespace WebApp.Controllers
         {
             if (!ModelState.IsValid)
             {
-                foreach (var error in ModelState.Values.SelectMany(v => v.Errors))
-                {
-                    ModelState.AddModelError("", error.ErrorMessage);
-                }
-
-                ViewData["TypeOfWorkId"] = new SelectList(_context.TypeOfWorks, "Id", "Name");
-                ViewData["AreaIds"] = new MultiSelectList(_context.Areas, "Id", "Name");
-
+                await PopulateDropdownsAsync();
                 return View(vm);
             }
 
-            bool duplicateExists = await _context.Mentors
-                .AnyAsync(m => m.Name == vm.Name && m.Surname == vm.Surname);
+            var client = _clientFactory.CreateClient("ApiClient");
 
-            if (duplicateExists)
+            var token = User.Claims.FirstOrDefault(c => c.Type == "AccessToken")?.Value;
+
+            if (!string.IsNullOrEmpty(token))
             {
-                ModelState.AddModelError("", "A mentor with this name already exists.");
-                ViewData["TypeOfWorkId"] = new SelectList(_context.TypeOfWorks, "Id", "Name");
-                ViewData["AreaNames"] = new SelectList(_context.Areas, "Id", "Name");
-                return View(vm);
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
-            var areas = await _context.Areas.Where(a => vm.AreaIds.Contains(a.Id)).ToListAsync();
-
+            // Handle image upload here - upload to wwwroot/uploads and get relative URL
             string? imagePath = null;
-
-            // Handle image upload manually from Request.Form.Files
             if (Request.Form.Files.Count > 0)
             {
-                IFormFile? imageFile = Request.Form.Files[0];
+                var imageFile = Request.Form.Files[0];
                 if (imageFile.Length > 0)
                 {
                     var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
@@ -156,185 +139,186 @@ namespace WebApp.Controllers
                 }
             }
 
-            var mentor = new Mentor
-            {
-                Name = vm.Name,
-                Surname = vm.Surname,
-                TypeOfWorkId = vm.TypeOfWorkId,
-                Areas = areas,
-                ImagePath = imagePath
-            };
+            // Map ViewModel to DTO and add ImagePath
+            var mentorDto = _mapper.Map<MentorDTO>(vm);
+            mentorDto.ImagePath = imagePath;
 
-            try
+            var response = await client.PostAsJsonAsync("/api/mentors", mentorDto);
+            if (response.IsSuccessStatusCode)
             {
-                _context.Mentors.Add(mentor);
-                await _context.SaveChangesAsync();
                 return RedirectToAction(nameof(Index));
             }
-            catch (Exception ex)
+            else
             {
-                ModelState.AddModelError("", $"Failed to create mentor: {ex.Message}");
-
-                ViewData["TypeOfWorkId"] = new SelectList(_context.TypeOfWorks, "Id", "Name");
-                ViewData["AreaIds"] = new MultiSelectList(_context.Areas, "Id", "Name");
+                ModelState.AddModelError("", "Failed to create mentor via API.");
+                await PopulateDropdownsAsync();
                 return View(vm);
             }
         }
 
-        // GET: MentorsController/Edit/5
-        [HttpGet]
+        // GET: Mentors/Edit/5
         public async Task<IActionResult> Edit(int id)
         {
-            var mentor = await _context.Mentors
-                .Include(m => m.Areas)
-                .Include(m => m.TypeOfWork)
-                .FirstOrDefaultAsync(m => m.Id == id);
+            var client = _clientFactory.CreateClient("ApiClient");
 
-            if (mentor == null) 
+            var token = User.Claims.FirstOrDefault(c => c.Type == "AccessToken")?.Value;
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var response = await client.GetAsync($"/api/mentors/{id}");
+
+            if (!response.IsSuccessStatusCode)
                 return NotFound();
 
-            var vm = new MentorViewModel
-            {
-                Id = mentor.Id,
-                Name = mentor.Name,
-                Surname = mentor.Surname,
-                TypeOfWorkId = mentor.TypeOfWork.Id,
-                AreaIds = mentor.Areas.Select(a => a.Id).ToList(),
-                AreaNames = mentor.Areas.Select(a => a.Name).ToList(),
-                ImagePath = mentor.ImagePath
-            };
+            var mentorDto = await response.Content.ReadFromJsonAsync<MentorDTO>();
+            var vm = _mapper.Map<MentorViewModel>(mentorDto);
 
-            ViewData["TypeOfWorkId"] = new SelectList(_context.TypeOfWorks, "Id", "Name");
-            ViewData["AreaIds"] = new MultiSelectList(_context.Areas, "Id", "Name");
+            await PopulateDropdownsAsync();
 
             return View(vm);
         }
 
-        // POST: MentorsController/Edit/5
+        // POST: Mentors/Edit/5
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(int id, MentorViewModel vm)
         {
-            if (id != vm.Id) 
+            if (id != vm.Id)
                 return BadRequest();
 
             if (!ModelState.IsValid)
             {
-                ViewData["TypeOfWorkId"] = new SelectList(_context.TypeOfWorks, "Id", "Name");
-                ViewData["AreaIds"] = new MultiSelectList(_context.Areas, "Id", "Name");
-
+                await PopulateDropdownsAsync();
                 return View(vm);
             }
 
-            var duplicate = await _context.Mentors
-                .AnyAsync(m => m.Id != id && m.Name == vm.Name && m.Surname == vm.Surname);
-            
-            if (duplicate)
+            var client = _clientFactory.CreateClient("ApiClient");
+
+            var token = User.Claims.FirstOrDefault(c => c.Type == "AccessToken")?.Value;
+
+            if (!string.IsNullOrEmpty(token))
             {
-                ModelState.AddModelError("", "Another mentor with this name already exists.");
-                
-                ViewData["TypeOfWorkId"] = new SelectList(_context.TypeOfWorks, "Id", "Name");
-                ViewData["AreaNames"] = new SelectList(_context.Areas, "Id", "Name");
-                
-                return View(vm);
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
-
-            var mentor = await _context.Mentors
-                .Include(m => m.Areas)
-                .FirstOrDefaultAsync(m => m.Id == id);
-
-
-            if (mentor == null) 
-                return NotFound();
-
-            mentor.Name = vm.Name;
-            mentor.Surname = vm.Surname;
-            mentor.TypeOfWorkId = vm.TypeOfWorkId;
-            mentor.Areas = await _context.Areas.Where(a => vm.AreaIds.Contains(a.Id)).ToListAsync();
 
             // Handle image upload if provided
-            var imageFile = Request.Form.Files.FirstOrDefault();
-            if (imageFile != null && imageFile.Length > 0)
+            if (Request.Form.Files.Count > 0)
             {
-                var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
-                if (!Directory.Exists(uploadsFolder))
-                    Directory.CreateDirectory(uploadsFolder);
-
-                var uniqueFileName = Guid.NewGuid().ToString() + Path.GetExtension(imageFile.FileName);
-                var filePath = Path.Combine(uploadsFolder, uniqueFileName);
-
-                using (var stream = new FileStream(filePath, FileMode.Create))
+                var imageFile = Request.Form.Files[0];
+                if (imageFile.Length > 0)
                 {
-                    await imageFile.CopyToAsync(stream);
-                }
+                    var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
+                    if (!Directory.Exists(uploadsFolder))
+                        Directory.CreateDirectory(uploadsFolder);
 
-                // Save relative path
-                mentor.ImagePath = "/uploads/" + uniqueFileName;
+                    var uniqueFileName = Guid.NewGuid().ToString() + Path.GetExtension(imageFile.FileName);
+                    var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+                    using (var stream = new FileStream(filePath, FileMode.Create))
+                    {
+                        await imageFile.CopyToAsync(stream);
+                    }
+
+                    vm.ImagePath = "/uploads/" + uniqueFileName;
+                }
             }
 
-            try
+            var mentorDto = _mapper.Map<MentorDTO>(vm);
+
+            var response = await client.PutAsJsonAsync($"/api/mentors/{id}", mentorDto);
+
+            if (response.IsSuccessStatusCode)
             {
-                _context.Update(mentor);
-                await _context.SaveChangesAsync();
                 return RedirectToAction(nameof(Index));
             }
-            catch
+            else
             {
-                // Log error
-                ModelState.AddModelError("", "Failed to update mentor.");
-
-                ViewData["TypeOfWorkId"] = new SelectList(_context.TypeOfWorks, "Id", "Name");
-                ViewData["AreaIds"] = new MultiSelectList(_context.Areas, "Id", "Name");
+                ModelState.AddModelError("", "Failed to update mentor via API.");
+                await PopulateDropdownsAsync();
                 return View(vm);
             }
         }
 
-        // GET: MentorsController/Delete/5
+        // GET: Mentors/Delete/5
         public async Task<IActionResult> Delete(int id)
         {
-            var mentor = await _context.Mentors
-                .Include(m => m.Areas)
-                .Include(m => m.TypeOfWork)
-                .FirstOrDefaultAsync(m => m.Id == id);
+            var client = _clientFactory.CreateClient("ApiClient");
 
-            if (mentor == null) 
+            var token = User.Claims.FirstOrDefault(c => c.Type == "AccessToken")?.Value;
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var response = await client.GetAsync($"/api/mentors/{id}");
+
+            if (!response.IsSuccessStatusCode)
                 return NotFound();
 
-            var vm = new MentorViewModel
-            {
-                Id = mentor.Id,
-                Name = mentor.Name,
-                Surname = mentor.Surname,
-                TypeOfWorkId = mentor.TypeOfWork.Id,
-                TypeOfWorkName = mentor.TypeOfWork.Name,
-                AreaNames = mentor.Areas.Select(a => a.Name).ToList(),
-                AreaIds = mentor.Areas.Select(a => a.Id).ToList()
-            };
+            var mentorDto = await response.Content.ReadFromJsonAsync<MentorDTO>();
+            var vm = _mapper.Map<MentorViewModel>(mentorDto);
 
             return View(vm);
         }
 
-
-        // POST: MentorsController/Delete/5
+        // POST: Mentors/Delete/5
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            var mentor = await _context.Mentors.FindAsync(id);
-            if (mentor == null) 
-                return NotFound();
+            var client = _clientFactory.CreateClient("ApiClient");
 
-            try
+            var token = User.Claims.FirstOrDefault(c => c.Type == "AccessToken")?.Value;
+
+            if (!string.IsNullOrEmpty(token))
             {
-                _context.Mentors.Remove(mentor);
-                await _context.SaveChangesAsync();
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var response = await client.DeleteAsync($"/api/mentors/{id}");
+
+            if (response.IsSuccessStatusCode)
+            {
                 return RedirectToAction(nameof(Index));
             }
-            catch
+            else
             {
-                ModelState.AddModelError("", "Failed to delete mentor.");
+                ModelState.AddModelError("", "Failed to delete mentor via API.");
                 return View();
             }
+        }
+
+        private async Task PopulateDropdownsAsync()
+        {
+            var client = _clientFactory.CreateClient("ApiClient");
+
+            var token = User.Claims.FirstOrDefault(c => c.Type == "AccessToken")?.Value;
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var towResponse = await client.GetAsync("/api/typeOfWork");
+            var areasResponse = await client.GetAsync("/api/area");
+
+            var typeOfWorkDtos = towResponse.IsSuccessStatusCode
+                ? await towResponse.Content.ReadFromJsonAsync<List<TypeOfWorkDTO>>()
+                : new List<TypeOfWorkDTO>();
+
+            var areaDtos = areasResponse.IsSuccessStatusCode
+                ? await areasResponse.Content.ReadFromJsonAsync<List<AreaDTO>>()
+                : new List<AreaDTO>();
+
+            var typeOfWorks = _mapper.Map<List<TypeOfWorkViewModel>>(typeOfWorkDtos);
+            var areas = _mapper.Map<List<AreaViewModel>>(areaDtos);
+
+            ViewData["TypeOfWorkId"] = new SelectList(typeOfWorks, "Id", "Name");
+            ViewData["AreaIds"] = new MultiSelectList(areas, "Id", "Name");
         }
     }
 }

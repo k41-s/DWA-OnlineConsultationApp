@@ -1,12 +1,14 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.CodeAnalysis.Scripting;
+﻿using AutoMapper;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using OnlineConsultationApp.core.DTOs;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-using WebAPI.DTOs;
 using WebAPI.Models;
 
 namespace WebAPI.Controllers
@@ -17,11 +19,13 @@ namespace WebAPI.Controllers
     {
         private readonly ConsultationsContext _context;
         private readonly IConfiguration _config;
+        private readonly IMapper _mapper;
 
-        public AuthController(ConsultationsContext context, IConfiguration config)
+        public AuthController(ConsultationsContext context, IConfiguration config, IMapper mapper)
         {
             _context = context;
             _config = config;
+            _mapper = mapper;
         }
 
         // Helper method to hash a password string
@@ -39,14 +43,12 @@ namespace WebAPI.Controllers
             if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
                 return BadRequest("Email already exists.");
 
-            var user = new User
-            {
-                Email = dto.Email,
-                PasswordHash = HashPassword(dto.Password),
-                Role = "User",
-                Name = dto.Name,
-                Surname = dto.Surname
-            };
+            // Use AutoMapper to map RegisterUserDTO to User
+            var user = _mapper.Map<User>(dto);
+
+            // Hash password manually (since mapping ignores it)
+            user.PasswordHash = HashPassword(dto.Password);
+            user.Role = "User"; // assign default role
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
@@ -81,14 +83,24 @@ namespace WebAPI.Controllers
             var tokenHandler = new JwtSecurityTokenHandler();
             var token = tokenHandler.CreateToken(tokenDescriptor);
 
-            return Ok(new AuthenticatedUserDTO
+            // Use AutoMapper to map User to AuthenticatedUserDTO
+            var authUserDto = _mapper.Map<AuthenticatedUserDTO>(user);
+            authUserDto.Token = tokenHandler.WriteToken(token);
+
+
+            var claims = new List<Claim>
             {
-                Token = tokenHandler.WriteToken(token),
-                Email = user.Email,
-                Role = user.Role,
-                Name = user.Name,
-                Surname = user.Surname
-            });
+                new Claim(ClaimTypes.Name, authUserDto.Email),
+                new Claim(ClaimTypes.Role, authUserDto.Role),
+                new Claim("AccessToken", authUserDto.Token)
+            };
+
+            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+            var principal = new ClaimsPrincipal(identity);
+
+            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
+
+            return Ok(authUserDto);
         }
 
         // POST: api/auth/changepassword

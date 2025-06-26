@@ -1,9 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using AutoMapper;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using WebAPI.DTOs;
+using OnlineConsultationApp.core.DTOs;
 using WebAPI.Models;
-
-// For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
 namespace WebAPI.Controllers
 {
@@ -12,25 +11,21 @@ namespace WebAPI.Controllers
     public class AreasController : ControllerBase
     {
         private readonly ConsultationsContext _context;
+        private readonly IMapper _mapper;
 
-        public AreasController(ConsultationsContext context)
+        public AreasController(ConsultationsContext context, IMapper mapper)
         {
             _context = context;
+            _mapper = mapper;
         }
 
         // GET: api/areas
         [HttpGet]
         public async Task<ActionResult<IEnumerable<AreaDTO>>> GetAll()
         {
-            var areas = await _context.Areas
-                .Select(a => new AreaDTO
-                {
-                    Id = a.Id,
-                    Name = a.Name
-                })
-                .ToListAsync();
-
-            return Ok(areas);
+            var areas = await _context.Areas.ToListAsync();
+            var areaDtos = _mapper.Map<List<AreaDTO>>(areas);
+            return Ok(areaDtos);
         }
 
         // GET api/areas/5
@@ -40,19 +35,13 @@ namespace WebAPI.Controllers
             try
             {
                 var area = await _context.Areas.FindAsync(id);
-
-                if (area == null) 
+                if (area == null)
                     return NotFound();
 
-                var areaDto = new AreaDTO
-                {
-                    Id = area.Id,
-                    Name = area.Name
-                };
-
-                return areaDto;
+                var areaDto = _mapper.Map<AreaDTO>(area);
+                return Ok(areaDto);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return StatusCode(500, "An unexpected error occurred while retrieving the area.");
             }
@@ -60,27 +49,18 @@ namespace WebAPI.Controllers
 
         // POST api/areas
         [HttpPost]
-        public async Task<ActionResult<AreaDTO>> Post([FromBody]AreaCreateDTO areaDto)
+        public async Task<ActionResult<AreaDTO>> Post([FromBody] AreaCreateDTO areaCreateDto)
         {
             try
             {
-                var area = new Area
-                {
-                    Name = areaDto.Name
-                };
-
+                var area = _mapper.Map<Area>(areaCreateDto);
                 _context.Areas.Add(area);
                 await _context.SaveChangesAsync();
 
-                var resultDto = new AreaDTO
-                {
-                    Name = area.Name,
-                    Id = area.Id
-                };
-
+                var resultDto = _mapper.Map<AreaDTO>(area);
                 return CreatedAtAction(nameof(Get), new { id = area.Id }, resultDto);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return StatusCode(500, "Creation failed.");
             }
@@ -88,7 +68,7 @@ namespace WebAPI.Controllers
 
         // PUT api/areas/5
         [HttpPut("{id}")]
-        public async Task<IActionResult> Put(int id, [FromBody]AreaCreateDTO areaDto)
+        public async Task<IActionResult> Put(int id, [FromBody] AreaCreateDTO areaDto)
         {
             try
             {
@@ -99,7 +79,8 @@ namespace WebAPI.Controllers
                 if (area == null)
                     return NotFound();
 
-                area.Name = areaDto.Name;
+                // Map changes from DTO to entity
+                _mapper.Map(areaDto, area);
 
                 _context.Entry(area).State = EntityState.Modified;
 
@@ -110,10 +91,10 @@ namespace WebAPI.Controllers
             {
                 if (!_context.Areas.Any(e => e.Id == id))
                     return NotFound();
-                else 
+                else
                     throw;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return StatusCode(500, "Update failed.");
             }
@@ -126,11 +107,10 @@ namespace WebAPI.Controllers
             try
             {
                 var area = await _context.Areas.FindAsync(id);
-                if (area == null) 
-                    return NotFound($"TypeOfWork with ID {id} not found.");
+                if (area == null)
+                    return NotFound($"Area with ID {id} not found.");
 
                 _context.Areas.Remove(area);
-
                 await _context.SaveChangesAsync();
 
                 return NoContent();

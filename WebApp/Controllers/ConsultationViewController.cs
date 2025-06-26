@@ -1,7 +1,9 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using WebApp.Models;
+using OnlineConsultationApp.core.DTOs;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using WebApp.ViewModels;
 
 namespace WebApp.Controllers
@@ -9,38 +11,33 @@ namespace WebApp.Controllers
     [Authorize]
     public class ConsultationViewController : Controller
     {
-        private readonly ConsultationsContext _context;
+        private readonly HttpClient _client;
+        private readonly IMapper _mapper;
 
-        public ConsultationViewController(ConsultationsContext context)
+        public ConsultationViewController(IHttpClientFactory factory, IMapper mapper)
         {
-            _context = context;
+            _client = factory.CreateClient("ApiClient");
+
+            _mapper = mapper;
         }
 
         [HttpGet]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> UsersWithConsultations()
         {
-            var users = await _context.Users
-                .Include(u => u.Consultations)
-                    .ThenInclude(c => c.Mentor)
-                .ToListAsync();
+            var token = User.Claims.FirstOrDefault(c => c.Type == "AccessToken")?.Value;
 
-            var vmList = users.Select(u => new UserWithConsultationsViewModel
+            if (!string.IsNullOrEmpty(token))
             {
-                Email = u.Email,
-                Name = u.Name,
-                Surname = u.Surname,
-                Role = u.Role,
-                Consultations = u.Consultations.Select(c => new ConsultationInfoViewModel
-                {
-                    RequestedAt = c.RequestedAt,
-                    Status = c.Status,
-                    Notes = c.Notes,
-                    MentorName = c.Mentor.Name,
-                    MentorSurname = c.Mentor.Surname
-                }).ToList()
-            }).ToList();
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
 
+            var response = await _client.GetAsync("api/users/with-consultations");
+            if (!response.IsSuccessStatusCode)
+                return View("Error");
+
+            var dtoList = await response.Content.ReadFromJsonAsync<List<UserWithConsultationsDTO>>();
+            var vmList = _mapper.Map<List<UserWithConsultationsViewModel>>(dtoList);
             return View(vmList);
         }
 
@@ -48,29 +45,35 @@ namespace WebApp.Controllers
         [Authorize(Roles = "User")]
         public async Task<IActionResult> MyConsultations()
         {
+            var token = User.Claims.FirstOrDefault(c => c.Type == "AccessToken")?.Value;
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
             var email = User.Identity?.Name;
-
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
-
-            if (user == null)
+            if (string.IsNullOrEmpty(email))
                 return Unauthorized();
 
-            var consultations = await _context.Consultations
-                .Include(c => c.Mentor)
-                .Where(c => c.UserId == user.Id)
-                .OrderByDescending(c => c.RequestedAt)
-                .ToListAsync();
+            var userResponse = await _client.GetAsync($"api/users/byemail/{email}");
+            if (!userResponse.IsSuccessStatusCode)
+                return Unauthorized();
 
-            var vms = consultations.Select(c => new MyConsultationViewModel
+            var user = await userResponse.Content.ReadFromJsonAsync<UserDTO>();
+
+            if (user == null)
             {
-                RequestedAt = c.RequestedAt,
-                Status = c.Status,
-                Notes = c.Notes,
-                MentorName = c.Mentor.Name,
-                MentorSurname = c.Mentor.Surname,
-                MentorImagePath = c.Mentor.ImagePath
-            }).ToList();
+                return Unauthorized();
+            }
 
+            var response = await _client.GetAsync($"api/consultations/user/{user.Id}");
+
+            if (!response.IsSuccessStatusCode)
+                return View("Error");
+
+            var dtoList = await response.Content.ReadFromJsonAsync<List<ConsultationDTO>>();
+            var vms = _mapper.Map<List<MyConsultationViewModel>>(dtoList);
             return View(vms);
         }
     }

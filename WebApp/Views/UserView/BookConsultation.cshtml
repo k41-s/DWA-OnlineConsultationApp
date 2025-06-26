@@ -6,8 +6,19 @@
 
 <h2>Book a Consultation with @Model.MentorName</h2>
 
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="alert alert-warning" role="alert">
+        @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+        {
+            <div>@error.ErrorMessage</div>
+        }
+    </div>
+}
+
 <form asp-action="BookConsultation" method="post">
     <input type="hidden" asp-for="MentorId" />
+    <input type="hidden" asp-for="MentorName" />
 
     <div class="form-group" style="padding: 2vh;">
         <label asp-for="Notes" class="control-label"></label>

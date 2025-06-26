@@ -2,52 +2,43 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
-using WebApp.Models;
 using WebApp.ViewModels;
-using System.Text;
-using System.Security.Cryptography;
-using Microsoft.EntityFrameworkCore;
+using AutoMapper;
+using System.Net.Http.Json;
+using OnlineConsultationApp.core.DTOs;
 using Microsoft.AspNetCore.Authorization;
 
 namespace WebApp.Controllers
 {
     public class AccountController : Controller
     {
-        private readonly ConsultationsContext _context;
+        private readonly IHttpClientFactory _clientFactory;
+        private readonly IMapper _mapper;
 
-        public AccountController(ConsultationsContext context)
+        public AccountController(IHttpClientFactory clientFactory, IMapper mapper)
         {
-            _context = context;
-        }
-
-        // Helper method to hash a password string
-        private string HashPassword(string password)
-        {
-            using var sha256 = SHA256.Create();
-            byte[] bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
-            return BitConverter.ToString(bytes).Replace("-", "").ToLowerInvariant();
+            _clientFactory = clientFactory;
+            _mapper = mapper;
         }
 
         [HttpGet]
         [Authorize]
         public async Task<IActionResult> Profile()
         {
-            var userEmail = User.Identity.Name;
+            var userEmail = User.Identity?.Name;
+            if (string.IsNullOrEmpty(userEmail))
+                return Unauthorized();
 
-            var admin = await _context.Users.FirstOrDefaultAsync(u => u.Email == userEmail);
-            
-            if (admin == null) 
+            var client = _clientFactory.CreateClient("ApiClient");
+            var response = await client.GetAsync($"api/users/byemail/{userEmail}");
+
+            if (!response.IsSuccessStatusCode)
                 return NotFound();
 
-            var vm = new ProfileViewModel
-            {
-                Email = admin.Email,
-                Name = admin.Name,
-                Surname = admin.Surname,
-                Phone = admin.Phone
-            };
+            var userDto = await response.Content.ReadFromJsonAsync<UserDTO>();
+            var vm = _mapper.Map<ProfileViewModel>(userDto);
 
-            ViewBag.IsAdmin = User.IsInRole("admin");
+            ViewBag.IsAdmin = User.IsInRole("Admin");
 
             return View(vm);
         }
@@ -56,31 +47,18 @@ namespace WebApp.Controllers
         [Authorize]
         public async Task<IActionResult> UpdateProfile([FromBody] ProfileViewModel vm)
         {
-            var email = User.Identity.Name;
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
-
-            if (user == null) 
-                return NotFound();
-
             if (!ModelState.IsValid)
-            {
                 return BadRequest(ModelState);
-            }
 
-            user.Name = vm.Name;
-            user.Surname = vm.Surname;
-            user.Email = vm.Email;
-            user.Phone = vm.Phone;
+            var client = _clientFactory.CreateClient("ApiClient");
+            var userDto = _mapper.Map<UserDTO>(vm);
 
-            try
-            {
-                await _context.SaveChangesAsync();
+            var response = await client.PutAsJsonAsync($"api/users/updateprofile/{userDto.Email}", userDto);
+
+            if (response.IsSuccessStatusCode)
                 return Json(new { success = true });
-            }
-            catch
-            {
-                return Json(new { success = false, message = "Could not update profile." });
-            }
+
+            return Json(new { success = false, message = "Could not update profile." });
         }
 
         [HttpGet]
@@ -96,23 +74,33 @@ namespace WebApp.Controllers
         [HttpPost]
         public async Task<IActionResult> LoginAsync(LoginViewModel model)
         {
-            if (!ModelState.IsValid) return View(model);
-
-            string pwdHash = HashPassword(model.Password);
-
-            var user = _context.Users
-                .FirstOrDefault(u => u.Email == model.Email && u.PasswordHash == pwdHash);
-
-            if (user == null)
-            {
-                ModelState.AddModelError("", "Invalid credentials or not an administrator.");
+            if (!ModelState.IsValid) 
                 return View(model);
+
+            var client = _clientFactory.CreateClient("ApiClient");
+            var loginDto = _mapper.Map<LoginDTO>(model);
+
+            var response = await client.PostAsJsonAsync("api/auth/login", loginDto);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                ModelState.AddModelError("", "Invalid credentials.");
+                return View(model);
+            }
+
+            var authenticatedUser = await response.Content.ReadFromJsonAsync<AuthenticatedUserDTO>();
+
+            if (authenticatedUser == null)
+            {
+                ModelState.AddModelError("", "Login failed. Please try again.");
+                return RedirectToAction("Login");
             }
 
             var claims = new List<Claim>
             {
-                new Claim(ClaimTypes.Name, user.Email),
-                new Claim(ClaimTypes.Role, user.Role)
+                new Claim(ClaimTypes.Name, authenticatedUser.Email),
+                new Claim(ClaimTypes.Role, authenticatedUser.Role),
+                new Claim("AccessToken", authenticatedUser.Token)
             };
 
             var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
@@ -120,12 +108,11 @@ namespace WebApp.Controllers
 
             await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
 
-            if (user.Role == "Admin")
+            if (authenticatedUser.Role == "Admin")
                 return RedirectToAction("Index", "Mentor");
             else
-                return RedirectToAction("Index", "UserView"); 
+                return RedirectToAction("Index", "UserView");
         }
-
 
         [HttpGet]
         public IActionResult Register()
@@ -145,25 +132,16 @@ namespace WebApp.Controllers
                 return View(vm);
             }
 
-            bool emailExists = await _context.Users.AnyAsync(u => u.Email == vm.Email);
-            if (emailExists)
+            var client = _clientFactory.CreateClient("ApiClient");
+            var registerDto = _mapper.Map<RegisterUserDTO>(vm);
+
+            var response = await client.PostAsJsonAsync("api/auth/register", registerDto);
+
+            if (!response.IsSuccessStatusCode)
             {
-                ModelState.AddModelError("", "Email already in use.");
+                ModelState.AddModelError("", "Email already in use or registration failed.");
                 return View(vm);
             }
-
-            var user = new User
-            {
-                Email = vm.Email,
-                PasswordHash = HashPassword(vm.Password),
-                Role = "User",
-                Name = vm.Name,
-                Surname = vm.Surname,
-                Phone = vm.Phone
-            };
-
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
 
             return RedirectToAction("Login", "Account");
         }

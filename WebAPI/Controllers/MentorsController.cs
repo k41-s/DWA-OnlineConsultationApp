@@ -1,11 +1,9 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage.ValueConversion.Internal;
-using WebAPI.DTOs;
+using OnlineConsultationApp.core.DTOs;
 using WebAPI.Models;
-
-// For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
 namespace WebAPI.Controllers
 {
@@ -15,10 +13,12 @@ namespace WebAPI.Controllers
     public class MentorsController : ControllerBase
     {
         private readonly ConsultationsContext _context;
+        private readonly IMapper _mapper;
 
-        public MentorsController(ConsultationsContext context)
+        public MentorsController(ConsultationsContext context, IMapper mapper)
         {
             _context = context;
+            _mapper = mapper;
         }
 
         private async Task AddLogAsync(string level, string message)
@@ -40,19 +40,11 @@ namespace WebAPI.Controllers
             var mentors = await _context.Mentors
                 .Include(m => m.TypeOfWork)
                 .Include(m => m.Areas)
-                .Select(m => new MentorDTO
-                {
-                    Id = m.Id,
-                    Name = m.Name,
-                    Surname = m.Surname,
-                    TypeOfWorkId = m.TypeOfWork.Id,
-                    TypeOfWorkName = m.TypeOfWork.Name,
-                    AreaIds = m.Areas.Select(a => a.Id).ToList(),
-                    AreaNames = m.Areas.Select(a => a.Name).ToList()
-                })
                 .ToListAsync();
 
-            return Ok(mentors);
+            var mentorsDto = _mapper.Map<List<MentorDTO>>(mentors);
+
+            return Ok(mentorsDto);
         }
 
         // GET api/mentors/5
@@ -64,18 +56,7 @@ namespace WebAPI.Controllers
                 var mentor = await _context.Mentors
                     .Include(m => m.TypeOfWork)
                     .Include(m => m.Areas)
-                    .Where(m => m.Id == id)
-                    .Select(m => new MentorDTO
-                    {
-                        Id = m.Id,
-                        Name = m.Name,
-                        Surname = m.Surname,
-                        TypeOfWorkId = m.TypeOfWork.Id,
-                        TypeOfWorkName = m.TypeOfWork.Name,
-                        AreaIds = m.Areas.Select(a => a.Id).ToList(),
-                        AreaNames = m.Areas.Select(a => a.Name).ToList()
-                    })
-                    .FirstOrDefaultAsync();
+                    .FirstOrDefaultAsync(m => m.Id == id);
 
                 if (mentor == null)
                 {
@@ -83,8 +64,10 @@ namespace WebAPI.Controllers
                     return NotFound();
                 }
 
+                var mentorDto = _mapper.Map<MentorDTO>(mentor);
+
                 await AddLogAsync("Information", $"Mentor with id={id} retrieved.");
-                return Ok(mentor);
+                return Ok(mentorDto);
             }
             catch (Exception ex)
             {
@@ -96,7 +79,7 @@ namespace WebAPI.Controllers
         // POST api/mentors
         [HttpPost]
         [Authorize(Roles = "Admin")]
-        public async Task<ActionResult<MentorDTO>> CreateMentor([FromBody]MentorCreateDTO dto)
+        public async Task<ActionResult<MentorDTO>> CreateMentor([FromBody] MentorCreateDTO dto)
         {
             try
             {
@@ -108,30 +91,15 @@ namespace WebAPI.Controllers
                     .Where(a => dto.AreaIds.Contains(a.Id))
                     .ToListAsync();
 
-                var mentor = new Mentor
-                {
-                    Name = dto.Name,
-                    Surname = dto.Surname,
-                    TypeOfWorkId = dto.TypeOfWorkId,
-                    Areas = areas
-                };
+                var mentor = _mapper.Map<Mentor>(dto);
+                mentor.Areas = areas;
 
                 _context.Mentors.Add(mentor);
                 await _context.SaveChangesAsync();
 
                 await AddLogAsync("Information", $"Mentor with id={mentor.Id} created.");
 
-                // Return the created Mentor as DTO
-                var resultDto = new MentorDTO
-                {
-                    Id = mentor.Id,
-                    Name = mentor.Name,
-                    Surname = mentor.Surname,
-                    TypeOfWorkId = typeOfWork.Id,
-                    TypeOfWorkName = typeOfWork.Name,
-                    AreaIds = areas.Select(a => a.Id).ToList(),
-                    AreaNames = areas.Select(a => a.Name).ToList()
-                };
+                var resultDto = _mapper.Map<MentorDTO>(mentor);
 
                 return CreatedAtAction(nameof(GetMentor), new { id = mentor.Id }, resultDto);
             }
@@ -145,7 +113,7 @@ namespace WebAPI.Controllers
         // PUT api/mentors/5
         [HttpPut("{id}")]
         [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> UpdateMentor(int id, [FromBody]MentorCreateDTO dto)
+        public async Task<IActionResult> UpdateMentor(int id, [FromBody] MentorCreateDTO dto)
         {
             if (id <= 0)
                 return BadRequest("Invalid mentor ID.");
@@ -160,9 +128,7 @@ namespace WebAPI.Controllers
                 return NotFound();
             }
 
-            var typeOfWork = await _context.TypeOfWorks
-                .FindAsync(dto.TypeOfWorkId);
-
+            var typeOfWork = await _context.TypeOfWorks.FindAsync(dto.TypeOfWorkId);
             if (typeOfWork == null)
                 return BadRequest("Invalid user or type of work ID.");
 
@@ -260,8 +226,8 @@ namespace WebAPI.Controllers
                 {
                     string nameLower = name.ToLower();
                     mentorsQuery = mentorsQuery.Where(m =>
-                        m.Name != null && m.Name.ToLower().Contains(nameLower) ||
-                        m.Surname != null && m.Surname.ToLower().Contains(nameLower)
+                        (m.Name != null && m.Name.ToLower().Contains(nameLower)) ||
+                        (m.Surname != null && m.Surname.ToLower().Contains(nameLower))
                     );
                 }
 
@@ -270,26 +236,17 @@ namespace WebAPI.Controllers
                 var mentors = await mentorsQuery
                     .Skip((page - 1) * pageSize)
                     .Take(pageSize)
-                    .Select(m => new MentorDTO
-                    {
-                        Id = m.Id,
-                        Name = m.Name,
-                        Surname = m.Surname,
-                        TypeOfWorkId = m.TypeOfWork.Id,
-                        TypeOfWorkName = m.TypeOfWork.Name,
-                        AreaIds = m.Areas.Select(a => a.Id).ToList(),
-                        AreaNames = m.Areas.Select(a => a.Name).ToList()
-                    })
                     .ToListAsync();
+
+                var mentorsDto = _mapper.Map<List<MentorDTO>>(mentors);
 
                 // Log successful search
                 await AddLogAsync("Information", $"Mentor search performed with name filter '{name}', page {page}, count {pageSize}.");
 
-
                 // Return paged result, optionally include total count in response headers or body
                 Response.Headers.Append("X-Total-Count", total.ToString());
 
-                return Ok(mentors);
+                return Ok(mentorsDto);
             }
             catch (Exception ex)
             {

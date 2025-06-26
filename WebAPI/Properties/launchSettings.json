@@ -12,7 +12,7 @@
     "http": {
       "commandName": "Project",
       "dotnetRunMessages": true,
-      "launchBrowser": true,
+      "launchBrowser": false, // For now, since it is currently a backend for the MVC
       "launchUrl": "login.html",
       "applicationUrl": "http://localhost:6555",
       "environmentVariables": {

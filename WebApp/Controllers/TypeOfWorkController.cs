@@ -1,8 +1,8 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
+﻿using System.Net.Http.Json;
+using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using WebApp.Models;
+using OnlineConsultationApp.core.DTOs;
 using WebApp.ViewModels;
 
 namespace WebApp.Controllers
@@ -10,23 +10,28 @@ namespace WebApp.Controllers
     [Authorize(Roles = "Admin")]
     public class TypeOfWorkController : Controller
     {
-        private readonly ConsultationsContext _context;
+        private readonly IHttpClientFactory _clientFactory;
+        private readonly IMapper _mapper;
 
-        public TypeOfWorkController(ConsultationsContext context)
+        public TypeOfWorkController(IHttpClientFactory clientFactory, IMapper mapper)
         {
-            _context = context;
+            _clientFactory = clientFactory;
+            _mapper = mapper;
         }
 
         // GET: TypeOfWork
         public async Task<IActionResult> Index()
         {
-            var types = await _context.TypeOfWorks.ToListAsync();
+            var client = _clientFactory.CreateClient("ApiClient");
 
-            var vmList = types.Select(t => new TypeOfWorkViewModel
+            var response = await client.GetAsync("/api/typeOfWork");
+            if (!response.IsSuccessStatusCode)
             {
-                Id = t.Id,
-                Name = t.Name
-            }).ToList();
+                return View(new List<TypeOfWorkViewModel>());
+            }
+
+            var dtoList = await response.Content.ReadFromJsonAsync<List<TypeOfWorkDTO>>();
+            var vmList = _mapper.Map<List<TypeOfWorkViewModel>>(dtoList);
 
             return View(vmList);
         }
@@ -34,14 +39,14 @@ namespace WebApp.Controllers
         // GET: TypeOfWork/Details/5
         public async Task<IActionResult> Details(int id)
         {
-            var type = await _context.TypeOfWorks.FindAsync(id);
-            if (type == null) return NotFound();
+            var client = _clientFactory.CreateClient("ApiClient");
+            var response = await client.GetAsync($"/api/typeOfWork/{id}");
 
-            var vm = new TypeOfWorkViewModel
-            {
-                Id = type.Id,
-                Name = type.Name
-            };
+            if (!response.IsSuccessStatusCode)
+                return NotFound();
+
+            var dto = await response.Content.ReadFromJsonAsync<TypeOfWorkDTO>();
+            var vm = _mapper.Map<TypeOfWorkViewModel>(dto);
 
             return View(vm);
         }
@@ -60,29 +65,31 @@ namespace WebApp.Controllers
             if (!ModelState.IsValid)
                 return View(vm);
 
-            bool exists = await _context.TypeOfWorks
-                .AnyAsync(t => t.Name == vm.Name);
+            var client = _clientFactory.CreateClient("ApiClient");
 
-            if (exists)
+            // Check for existing TypeOfWork by name before creating
+            var allResponse = await client.GetAsync("/api/typeOfWork");
+
+            var allDtos = allResponse.IsSuccessStatusCode
+                ? await allResponse.Content.ReadFromJsonAsync<List<TypeOfWorkDTO>>()
+                : new List<TypeOfWorkDTO>();
+
+            if (allDtos.Any(t => string.Equals(t.Name, vm.Name, StringComparison.OrdinalIgnoreCase)))
             {
                 ModelState.AddModelError("", "A type of work with this name already exists.");
                 return View(vm);
             }
 
-            var type = new TypeOfWork
-            {
-                Name = vm.Name
-            };
+            var dto = _mapper.Map<TypeOfWorkDTO>(vm);
 
-            try
+            var response = await client.PostAsJsonAsync("/api/typeOfWork", dto);
+            if (response.IsSuccessStatusCode)
             {
-                _context.TypeOfWorks.Add(type);
-                await _context.SaveChangesAsync();
                 return RedirectToAction(nameof(Index));
             }
-            catch
+            else
             {
-                ModelState.AddModelError("", "Failed to create TypeOfWork.");
+                ModelState.AddModelError("", "Failed to create TypeOfWork via API.");
                 return View(vm);
             }
         }
@@ -90,14 +97,14 @@ namespace WebApp.Controllers
         // GET: TypeOfWork/Edit/5
         public async Task<IActionResult> Edit(int id)
         {
-            var type = await _context.TypeOfWorks.FindAsync(id);
-            if (type == null) return NotFound();
+            var client = _clientFactory.CreateClient("ApiClient");
+            var response = await client.GetAsync($"/api/typeOfWork/{id}");
 
-            var vm = new TypeOfWorkViewModel
-            {
-                Id = type.Id,
-                Name = type.Name
-            };
+            if (!response.IsSuccessStatusCode)
+                return NotFound();
+
+            var dto = await response.Content.ReadFromJsonAsync<TypeOfWorkDTO>();
+            var vm = _mapper.Map<TypeOfWorkViewModel>(dto);
 
             return View(vm);
         }
@@ -107,34 +114,37 @@ namespace WebApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(int id, TypeOfWorkViewModel vm)
         {
-            if (id != vm.Id) return BadRequest();
+            if (id != vm.Id)
+                return BadRequest();
 
             if (!ModelState.IsValid)
                 return View(vm);
 
-            var duplicate = await _context.TypeOfWorks
-                .AnyAsync(t => t.Id != id && t.Name == vm.Name);
+            var client = _clientFactory.CreateClient("ApiClient");
 
-            if (duplicate)
+            // Check for duplicates
+            var allResponse = await client.GetAsync("/api/typeOfWork");
+
+            var allDtos = allResponse.IsSuccessStatusCode
+                ? await allResponse.Content.ReadFromJsonAsync<List<TypeOfWorkDTO>>()
+                : new List<TypeOfWorkDTO>();
+
+            if (allDtos.Any(t => t.Id != id && string.Equals(t.Name, vm.Name, StringComparison.OrdinalIgnoreCase)))
             {
                 ModelState.AddModelError("", "Another type of work with this name already exists.");
                 return View(vm);
             }
 
-            var type = await _context.TypeOfWorks.FindAsync(id);
-            if (type == null) return NotFound();
+            var dto = _mapper.Map<TypeOfWorkDTO>(vm);
 
-            type.Name = vm.Name;
-
-            try
+            var response = await client.PutAsJsonAsync($"/api/typeOfWork/{id}", dto);
+            if (response.IsSuccessStatusCode)
             {
-                _context.Update(type);
-                await _context.SaveChangesAsync();
                 return RedirectToAction(nameof(Index));
             }
-            catch
+            else
             {
-                ModelState.AddModelError("", "Failed to update TypeOfWork.");
+                ModelState.AddModelError("", "Failed to update TypeOfWork via API.");
                 return View(vm);
             }
         }
@@ -142,14 +152,14 @@ namespace WebApp.Controllers
         // GET: TypeOfWork/Delete/5
         public async Task<IActionResult> Delete(int id)
         {
-            var type = await _context.TypeOfWorks.FindAsync(id);
-            if (type == null) return NotFound();
+            var client = _clientFactory.CreateClient("ApiClient");
+            var response = await client.GetAsync($"/api/typeOfWork/{id}");
 
-            var vm = new TypeOfWorkViewModel
-            {
-                Id = type.Id,
-                Name = type.Name
-            };
+            if (!response.IsSuccessStatusCode)
+                return NotFound();
+
+            var dto = await response.Content.ReadFromJsonAsync<TypeOfWorkDTO>();
+            var vm = _mapper.Map<TypeOfWorkViewModel>(dto);
 
             return View(vm);
         }
@@ -159,33 +169,37 @@ namespace WebApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            var type = await _context.TypeOfWorks.FindAsync(id);
-            if (type == null) return NotFound();
+            var client = _clientFactory.CreateClient("ApiClient");
+            var response = await client.DeleteAsync($"/api/typeOfWork/{id}");
 
-            try
+            if (response.IsSuccessStatusCode)
             {
-                _context.TypeOfWorks.Remove(type);
-                await _context.SaveChangesAsync();
                 return RedirectToAction(nameof(Index));
             }
-            catch (DbUpdateException)
+            else if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
             {
                 ModelState.AddModelError("", "Cannot delete this TypeOfWork because it has related Mentors.");
-                var vm = new TypeOfWorkViewModel
-                {
-                    Id = type.Id,
-                    Name = type.Name
-                };
+
+                var reloadResponse = await client.GetAsync($"/api/typeOfWork/{id}");
+
+                if (!reloadResponse.IsSuccessStatusCode)
+                    return NotFound();
+
+                var dto = await reloadResponse.Content.ReadFromJsonAsync<TypeOfWorkDTO>();
+                var vm = _mapper.Map<TypeOfWorkViewModel>(dto);
+
                 return View("Delete", vm);
             }
-            catch
+            else
             {
-                ModelState.AddModelError("", "Failed to delete TypeOfWork.");
-                var vm = new TypeOfWorkViewModel
-                {
-                    Id = type.Id,
-                    Name = type.Name
-                };
+                ModelState.AddModelError("", "Failed to delete TypeOfWork via API.");
+                var reloadResponse = await client.GetAsync($"/api/typeOfWork/{id}");
+                if (!reloadResponse.IsSuccessStatusCode)
+                    return NotFound();
+
+                var dto = await reloadResponse.Content.ReadFromJsonAsync<TypeOfWorkDTO>();
+                var vm = _mapper.Map<TypeOfWorkViewModel>(dto);
+
                 return View("Delete", vm);
             }
         }

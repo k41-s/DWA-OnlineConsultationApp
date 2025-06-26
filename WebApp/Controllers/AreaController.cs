@@ -1,8 +1,8 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
+﻿using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using WebApp.Models;
+using OnlineConsultationApp.core.DTOs;
+using System.Net.Http.Json;
 using WebApp.ViewModels;
 
 namespace WebApp.Controllers
@@ -10,90 +10,68 @@ namespace WebApp.Controllers
     [Authorize(Roles = "Admin")]
     public class AreaController : Controller
     {
-        private readonly ConsultationsContext _context;
+        private readonly HttpClient _client;
+        private readonly IMapper _mapper;
 
-        public AreaController(ConsultationsContext context)
+        public AreaController(IHttpClientFactory factory, IMapper mapper)
         {
-            _context = context;
+            _client = factory.CreateClient("ApiClient");
+            _mapper = mapper;
         }
 
         // GET: Area
         public async Task<IActionResult> Index()
         {
-            var areas = await _context.Areas
-                .Select(a => new AreaViewModel
-                {
-                    Id = a.Id,
-                    Name = a.Name
-                })
-                .ToListAsync();
+            var response = await _client.GetAsync("api/areas");
+            if (!response.IsSuccessStatusCode)
+                return View("Error");
 
-            return View(areas);
+            var dtos = await response.Content.ReadFromJsonAsync<List<AreaDTO>>();
+            var vms = _mapper.Map<List<AreaViewModel>>(dtos);
+            return View(vms);
         }
 
         // GET: Area/Details/5
         public async Task<IActionResult> Details(int id)
         {
-            var area = await _context.Areas
-                .FirstOrDefaultAsync(a => a.Id == id);
+            var response = await _client.GetAsync($"api/areas/{id}");
+            if (!response.IsSuccessStatusCode)
+                return NotFound();
 
-            if (area == null) return NotFound();
-
-            var vm = new AreaViewModel
-            {
-                Id = area.Id,
-                Name = area.Name
-            };
-
+            var dto = await response.Content.ReadFromJsonAsync<AreaDTO>();
+            var vm = _mapper.Map<AreaViewModel>(dto);
             return View(vm);
         }
 
         // GET: Area/Create
-        public IActionResult Create()
-        {
-            return View();
-        }
+        public IActionResult Create() => View();
 
         // POST: Area/Create
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(AreaViewModel vm)
         {
-            if (!ModelState.IsValid) 
-                return View(vm);
+            if (!ModelState.IsValid) return View(vm);
 
-            bool exists = await _context.Areas
-                .AnyAsync(a => a.Name == vm.Name);
+            var dto = _mapper.Map<AreaCreateDTO>(vm);
+            var response = await _client.PostAsJsonAsync("api/areas", dto);
 
-            if (exists)
-            {
-                ModelState.AddModelError("", "An area with this name already exists.");
-                return View(vm);
-            }
+            if (response.IsSuccessStatusCode)
+                return RedirectToAction(nameof(Index));
 
-            var area = new Area
-            {
-                Name = vm.Name
-            };
-
-            _context.Add(area);
-            await _context.SaveChangesAsync();
-            return RedirectToAction(nameof(Index));
+            ModelState.AddModelError("", "An area with this name may already exist.");
+            return View(vm);
         }
 
         // GET: Area/Edit/5
         public async Task<IActionResult> Edit(int id)
         {
-            var area = await _context.Areas.FindAsync(id);
-            if (area == null) 
+            var response = await _client.GetAsync($"api/areas/{id}");
+            if (!response.IsSuccessStatusCode)
                 return NotFound();
 
-            var vm = new AreaViewModel
-            {
-                Id = area.Id,
-                Name = area.Name
-            };
-
+            var dto = await response.Content.ReadFromJsonAsync<AreaDTO>();
+            var vm = _mapper.Map<AreaViewModel>(dto);
             return View(vm);
         }
 
@@ -102,53 +80,28 @@ namespace WebApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(int id, AreaViewModel vm)
         {
-            if (id != vm.Id) 
-                return BadRequest();
+            if (id != vm.Id) return BadRequest();
+            if (!ModelState.IsValid) return View(vm);
 
-            if (!ModelState.IsValid) 
-                return View(vm);
+            var dto = _mapper.Map<AreaCreateDTO>(vm);
+            var response = await _client.PutAsJsonAsync($"api/areas/{id}", dto);
 
-            var duplicate = await _context.Areas
-                .AnyAsync(a => a.Id != id && a.Name == vm.Name);
-
-            if (duplicate)
-            {
-                ModelState.AddModelError("", "Another area with this name already exists.");
-                return View(vm);
-            }
-
-            var area = await _context.Areas.FindAsync(id);
-
-            if (area == null) 
-                return NotFound();
-
-            area.Name = vm.Name;
-
-            try
-            {
-                _context.Update(area);
-                await _context.SaveChangesAsync();
+            if (response.IsSuccessStatusCode)
                 return RedirectToAction(nameof(Index));
-            }
-            catch
-            {
-                ModelState.AddModelError("", "Failed to update area.");
-                return View(vm);
-            }
+
+            ModelState.AddModelError("", "Another area with this name may already exist.");
+            return View(vm);
         }
 
         // GET: Area/Delete/5
         public async Task<IActionResult> Delete(int id)
         {
-            var area = await _context.Areas.FindAsync(id);
-            if (area == null) return NotFound();
+            var response = await _client.GetAsync($"api/areas/{id}");
+            if (!response.IsSuccessStatusCode)
+                return NotFound();
 
-            var vm = new AreaViewModel
-            {
-                Id = area.Id,
-                Name = area.Name
-            };
-
+            var dto = await response.Content.ReadFromJsonAsync<AreaDTO>();
+            var vm = _mapper.Map<AreaViewModel>(dto);
             return View(vm);
         }
 
@@ -157,20 +110,13 @@ namespace WebApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            var area = await _context.Areas.FindAsync(id);
-            if (area == null) return NotFound();
+            var response = await _client.DeleteAsync($"api/areas/{id}");
 
-            try
-            {
-                _context.Areas.Remove(area);
-                await _context.SaveChangesAsync();
+            if (response.IsSuccessStatusCode)
                 return RedirectToAction(nameof(Index));
-            }
-            catch
-            {
-                ModelState.AddModelError("", "Failed to delete area.");
-                return View();
-            }
+
+            ModelState.AddModelError("", "Failed to delete area (might be linked to a mentor).");
+            return View();
         }
     }
 }

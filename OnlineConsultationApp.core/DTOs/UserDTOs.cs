@@ -1,4 +1,4 @@
-﻿namespace WebAPI.DTOs
+﻿namespace OnlineConsultationApp.core.DTOs
 {
     public class RegisterUserDTO
     {

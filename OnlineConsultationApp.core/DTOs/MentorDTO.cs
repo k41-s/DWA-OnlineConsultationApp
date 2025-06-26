@@ -1,4 +1,4 @@
-﻿namespace WebAPI.DTOs
+﻿namespace OnlineConsultationApp.core.DTOs
 {
     public class MentorDTO
     {
@@ -10,6 +10,7 @@
         // TypeOfWork details
         public int TypeOfWorkId { get; set; }
         public string TypeOfWorkName { get; set; } = null!;
+        public string? ImagePath { get; set; }
 
         // List of Areas (ids and names)
         public List<int> AreaIds { get; set; } = new();

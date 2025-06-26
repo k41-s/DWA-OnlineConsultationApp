@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -50,11 +51,30 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddDbContext<ConsultationsContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.AddAutoMapper(typeof(Program));
+
 // Configure JWT
 var jwtConfig = builder.Configuration.GetSection("Jwt");
 var key = jwtConfig["Key"];
 var issuer = jwtConfig["Issuer"];
 var audience = jwtConfig["Audience"];
+
+
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/Account/Login"; // redirect path when not authenticated
+        options.LogoutPath = "/Account/Logout";
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
+        options.SlidingExpiration = true;
+        options.Cookie.IsEssential = true;
+        options.AccessDeniedPath = "/Home/Index"; // go back to index
+        options.Events.OnRedirectToLogin = context =>
+        {
+            context.Response.Redirect(context.RedirectUri + "&reason=unauthorized");
+            return Task.CompletedTask;
+        };
+    });
 
 builder.Services.AddAuthentication(options =>
 {
@@ -86,12 +106,12 @@ builder.Services.AddAuthentication(options =>
         },
         OnTokenValidated = context =>
         {
-            Console.WriteLine("Token validated for user: " + context.Principal.Identity?.Name);
+            Console.WriteLine("Token validated for user: " + context.Principal?.Identity?.Name);
             return Task.CompletedTask;
         }
     };
 });
-
+builder.Services.AddAuthorization();
 
 var app = builder.Build();
 

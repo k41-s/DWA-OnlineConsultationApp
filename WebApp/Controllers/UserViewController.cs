@@ -1,9 +1,11 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Security.Claims;
+using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore;
-using System.Security.Claims;
-using WebApp.Models;
+using OnlineConsultationApp.core.DTOs;
 using WebApp.ViewModels;
 
 namespace WebApp.Controllers
@@ -11,102 +13,141 @@ namespace WebApp.Controllers
     [Authorize]
     public class UserViewController : Controller
     {
-        private readonly ConsultationsContext _context;
+        private readonly IHttpClientFactory _clientFactory;
+        private readonly IMapper _mapper;
+        private const int PageSize = 10;
 
-        public UserViewController(ConsultationsContext context)
+        public UserViewController(IHttpClientFactory clientFactory, IMapper mapper)
         {
-            _context = context;
+            _clientFactory = clientFactory;
+            _mapper = mapper;
         }
 
-        public async Task<IActionResult> Index(string search, int? typeOfWorkId, int page = 1)
+        // GET: UserView
+        public async Task<IActionResult> Index(string? name, int? typeOfWorkId, int page = 1)
         {
-            int pageSize = 10;
+            var client = _clientFactory.CreateClient("ApiClient");
 
-            var query = _context.Mentors
-                .Include(m => m.TypeOfWork)
-                .Include(m => m.Areas)
-                .AsQueryable();
+            var token = User.Claims.FirstOrDefault(c => c.Type == "AccessToken")?.Value;
 
-            if (!string.IsNullOrEmpty(search))
+            if (!string.IsNullOrEmpty(token))
             {
-                query = query.Where(m => m.Name.Contains(search) || m.Surname.Contains(search));
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
-            if (typeOfWorkId.HasValue)
+            var queryParams = new List<string>();
+
+            if (!string.IsNullOrEmpty(name))
+                queryParams.Add($"name={Uri.EscapeDataString(name)}");
+
+            queryParams.Add($"page={page}");
+            queryParams.Add($"pageSize={PageSize}");
+
+            string queryString = string.Join('&', queryParams);
+
+            var response = await client.GetAsync($"/api/mentors/search?{queryString}");
+
+            if (!response.IsSuccessStatusCode)
             {
-                query = query.Where(m => m.TypeOfWorkId == typeOfWorkId);
+                return View("Error", new ErrorViewModel { RequestId = "Failed to load mentors." });
             }
 
-            var totalCount = await query.CountAsync();
-
-            var mentors = await query
-                .OrderBy(m => m.Name)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
-
-            var mentorVMs = mentors.Select(m => new MentorViewModel
+            var mentorDtos = await response.Content.ReadFromJsonAsync<List<MentorDTO>>();
+            if (mentorDtos == null)
             {
-                Id = m.Id,
-                Name = m.Name,
-                Surname = m.Surname,
-                TypeOfWorkId = m.TypeOfWorkId,
-                TypeOfWorkName = m.TypeOfWork?.Name ?? "",
-                ImagePath = m.ImagePath,
-                AreaNames = m.Areas.Select(a => a.Name).ToList()
-            }).ToList();
+                return View("Error", new ErrorViewModel { RequestId = "Invalid data from API." });
+            }
 
-            ViewData["CurrentSearch"] = search;
+            var mentors = _mapper.Map<List<MentorViewModel>>(mentorDtos);
+
+            // Read total count from headers for pagination
+            int totalMentors = 0;
+            if (response.Headers.TryGetValues("X-Total-Count", out var totalValues))
+            {
+                int.TryParse(totalValues.FirstOrDefault(), out totalMentors);
+            }
+
+            int totalPages = (int)Math.Ceiling(totalMentors / (double)PageSize);
+
+            ViewData["CurrentSearch"] = name;
             ViewData["CurrentTypeOfWorkId"] = typeOfWorkId;
-            ViewData["TotalPages"] = (int)Math.Ceiling((double)totalCount / pageSize);
             ViewData["CurrentPage"] = page;
-            ViewData["TypeOfWorkList"] = new SelectList(_context.TypeOfWorks, "Id", "Name");
+            ViewData["TotalPages"] = totalPages;
 
-            return View(mentorVMs);
+            // Get TypeOfWork dropdown
+            var towResponse = await client.GetAsync("api/typeofwork");
+            if (towResponse.IsSuccessStatusCode)
+            {
+                var typeOfWorkDtos = await towResponse.Content.ReadFromJsonAsync<List<TypeOfWorkDTO>>();
+
+                var typeOfWorks = _mapper.Map<List<TypeOfWorkViewModel>>(typeOfWorkDtos);
+
+                ViewData["TypeOfWorkList"] = new SelectList(typeOfWorks ?? new List<TypeOfWorkViewModel>(), "Id", "Name");
+            }
+            else
+            {
+                ViewData["TypeOfWorkList"] = new SelectList(new List<TypeOfWorkViewModel>(), "Id", "Name");
+            }
+
+            return View(mentors);
         }
 
+
+        // GET: UserView/MentorDetails/5
         public async Task<IActionResult> MentorDetails(int id)
         {
-            if(!User.Identity?.IsAuthenticated ?? true)
+            var client = _clientFactory.CreateClient("ApiClient");
+
+            var token = User.Claims.FirstOrDefault(c => c.Type == "AccessToken")?.Value;
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            if (!User.Identity?.IsAuthenticated ?? true)
                 return RedirectToAction("Login", "Account");
 
-            string? email = User.Identity?.Name;
-
+            var email = User.Identity?.Name;
             if (string.IsNullOrEmpty(email))
                 return Unauthorized();
 
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+            // Get user by email to find userId
+            var userResponse = await client.GetAsync($"api/users/byemail/{email}");
+            if (!userResponse.IsSuccessStatusCode)
+                return Unauthorized();
 
+            var user = await userResponse.Content.ReadFromJsonAsync<UserDTO>();
             if (user == null)
                 return Unauthorized();
 
             int userId = user.Id;
 
-            var mentor = await _context.Mentors
-                .Include(m => m.TypeOfWork)
-                .Include(m => m.Areas)
-                .FirstOrDefaultAsync(m => m.Id == id);
-
-            if (mentor == null)
+            // Get mentor details by id
+            var mentorResponse = await client.GetAsync($"api/mentors/{id}");
+            if (!mentorResponse.IsSuccessStatusCode)
                 return NotFound();
 
-            var hasBooked = await _context.Consultations
-                .AnyAsync(c => c.MentorId == id && c.UserId == userId);
+            var mentorDto = await mentorResponse.Content.ReadFromJsonAsync<MentorDTO>();
+            if (mentorDto == null)
+                return NotFound();
 
-            var vm = new MentorViewModel
+            var mentor = _mapper.Map<MentorViewModel>(mentorDto);
+
+            // Check if user has booked a consultation with this mentor
+            var consultationResponse = await client.GetAsync($"api/consultations/user/{userId}");
+            if (!consultationResponse.IsSuccessStatusCode)
             {
-                Id = mentor.Id,
-                Name = mentor.Name,
-                Surname = mentor.Surname,
-                TypeOfWorkId = mentor.TypeOfWorkId,
-                TypeOfWorkName = mentor.TypeOfWork?.Name ?? "",
-                ImagePath = mentor.ImagePath,
-                AreaIds = mentor.Areas.Select(a => a.Id).ToList(),
-                AreaNames = mentor.Areas.Select(a => a.Name).ToList()
-            };
+                ViewData["HasBooked"] = false; // Assume false on error
+            }
+            else
+            {
+                var consultations = await consultationResponse.Content.ReadFromJsonAsync<List<ConsultationDTO>>();
+                bool hasBooked = consultations?.Any(c => c.MentorId == id) ?? false;
+                ViewData["HasBooked"] = hasBooked;
+            }
 
-            ViewData["HasBooked"] = hasBooked;
-            return View(vm);
+            return View(mentor);
         }
 
         // GET: UserView/BookConsultation/5
@@ -114,13 +155,29 @@ namespace WebApp.Controllers
         [Authorize(Roles = "User")]
         public async Task<IActionResult> BookConsultation(int id)
         {
-            var mentor = await _context.Mentors.FindAsync(id);
-            if (mentor == null) return NotFound();
+            var client = _clientFactory.CreateClient("ApiClient");
+
+            var token = User.Claims.FirstOrDefault(c => c.Type == "AccessToken")?.Value;
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var response = await client.GetAsync($"api/mentors/{id}");
+            if (!response.IsSuccessStatusCode)
+                return NotFound();
+
+            var mentorDto = await response.Content.ReadFromJsonAsync<MentorDTO>();
+            if (mentorDto == null)
+                return NotFound();
+
+            var mentor = _mapper.Map<MentorViewModel>(mentorDto);
 
             var vm = new ConsultationViewModel
             {
                 MentorId = mentor.Id,
-                MentorName = mentor.Name + " " + mentor.Surname
+                MentorName = $"{mentor.Name} {mentor.Surname}"
             };
 
             return View(vm);
@@ -132,37 +189,63 @@ namespace WebApp.Controllers
         [Authorize(Roles = "User")]
         public async Task<IActionResult> BookConsultation(ConsultationViewModel model)
         {
+            var client = _clientFactory.CreateClient("ApiClient");
+
+            var token = User.Claims.FirstOrDefault(c => c.Type == "AccessToken")?.Value;
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
             if (!ModelState.IsValid)
                 return View(model);
 
-            var userEmail = User.Identity?.Name;
+            var email = User.Identity?.Name;
+            if (string.IsNullOrEmpty(email))
+                return Unauthorized();
 
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == userEmail);
+            // Get user by email to find userId
+            var userResponse = await client.GetAsync($"api/users/byemail/{email}");
+            if (!userResponse.IsSuccessStatusCode)
+                return Unauthorized();
 
-            if (user == null) 
+            var user = await userResponse.Content.ReadFromJsonAsync<UserDTO>();
+            if (user == null)
                 return Unauthorized();
 
             // Check if already booked
-            var alreadyBooked = await _context.Consultations
-                .AnyAsync(c => c.MentorId == model.MentorId && c.UserId == user.Id);
-
-            if (alreadyBooked)
-                return RedirectToAction("MentorDetails", new { id = model.MentorId }); // optionally flash a message
-
-
-            var consultation = new Consultation
+            var consultsResponse = await client.GetAsync($"api/consultations/user/{user.Id}");
+            if (consultsResponse.IsSuccessStatusCode)
             {
-                MentorId = model.MentorId,
+                var consultations = await consultsResponse.Content.ReadFromJsonAsync<List<ConsultationDTO>>();
+                if (consultations?.Any(c => c.MentorId == model.MentorId) == true)
+                {
+                    ModelState.AddModelError("", "You have already booked a consultation with this mentor.");
+                    return View(model);
+                }
+            }
+
+            // Prepare create DTO
+            var createDto = new ConsultationCreateDTO
+            {
                 UserId = user.Id,
-                RequestedAt = DateTime.Now,
-                Status = "Pending",
-                Notes = model.Notes
+                MentorId = model.MentorId,
+                Notes = model.Notes ?? ""
             };
 
-            _context.Consultations.Add(consultation);
-            await _context.SaveChangesAsync();
+            var postResponse = await client.PostAsJsonAsync("api/consultations", createDto);
+
+            Console.WriteLine($"testing: {postResponse.StatusCode}");
+            if (!postResponse.IsSuccessStatusCode)
+            {
+                ModelState.AddModelError("", "Failed to book consultation. Please try again later.");
+                
+                return View(model);
+            }
 
             return RedirectToAction("MyConsultations", "ConsultationView");
         }
     }
+
 }
