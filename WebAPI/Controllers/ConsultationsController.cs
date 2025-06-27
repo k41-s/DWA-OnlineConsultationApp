@@ -30,18 +30,7 @@ namespace WebAPI.Controllers
             if (mentor == null)
                 return NotFound("Mentor not found");
 
-            
-            var consultation = new Consultation
-            {
-                UserId = dto.UserId,
-                MentorId = dto.MentorId,
-                Notes = dto.Notes,
-                RequestedAt = dto.RequestedAt,
-                Status = dto.Status
-            };
-            
-
-            //var consultation = _mapper.Map<Consultation>(dto);
+            var consultation = _mapper.Map<Consultation>(dto);
 
             _context.Consultations.Add(consultation);
             await _context.SaveChangesAsync();
