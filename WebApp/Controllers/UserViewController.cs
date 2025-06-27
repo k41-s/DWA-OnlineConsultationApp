@@ -238,14 +238,17 @@ namespace WebApp.Controllers
             {
                 UserId = user.Id,
                 MentorId = model.MentorId,
-                Notes = model.Notes ?? ""
+                Notes = model.Notes ?? "",
+                RequestedAt = DateTime.UtcNow,
+                Status = "Pending"
             };
 
-            var postResponse = await client.PostAsJsonAsync("api/consultations", createDto);
+            var postResponse = await client.PostAsJsonAsync("api/consultations/create", createDto);
 
-            Console.WriteLine($"testing: {postResponse.StatusCode}");
             if (!postResponse.IsSuccessStatusCode)
             {
+                Console.WriteLine($"Response: {postResponse.StatusCode}");
+
                 ModelState.AddModelError("", "Failed to book consultation. Please try again later.");
                 
                 return View(model);

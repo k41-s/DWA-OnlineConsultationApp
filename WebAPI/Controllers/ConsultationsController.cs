@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using OnlineConsultationApp.core.DTOs;
 using WebAPI.Models;
+using AutoMapper;
 
 namespace WebAPI.Controllers
 {
@@ -13,28 +14,34 @@ namespace WebAPI.Controllers
     public class ConsultationsController : ControllerBase
     {
         private readonly ConsultationsContext _context;
+        private readonly IMapper _mapper;
 
-        public ConsultationsController(ConsultationsContext context)
+        public ConsultationsController(ConsultationsContext context, IMapper mapper)
         {
             _context = context;
+            _mapper = mapper;
         }
 
-        // POST: api/consultations
-        [HttpPost]
+        // POST: api/consultations/create
+        [HttpPost("create")]
         public async Task<IActionResult> CreateConsultation([FromBody] ConsultationCreateDTO dto)
         {
             var mentor = await _context.Mentors.FindAsync(dto.MentorId);
             if (mentor == null)
-                return BadRequest("Mentor does not exist.");
+                return NotFound("Mentor not found");
 
+            
             var consultation = new Consultation
             {
                 UserId = dto.UserId,
                 MentorId = dto.MentorId,
                 Notes = dto.Notes,
-                RequestedAt = DateTime.UtcNow,
-                Status = "Pending"
+                RequestedAt = dto.RequestedAt,
+                Status = dto.Status
             };
+            
+
+            //var consultation = _mapper.Map<Consultation>(dto);
 
             _context.Consultations.Add(consultation);
             await _context.SaveChangesAsync();
