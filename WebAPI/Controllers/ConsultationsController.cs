@@ -23,8 +23,6 @@ namespace WebAPI.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateConsultation([FromBody] ConsultationCreateDTO dto)
         {
-            
-
             var mentor = await _context.Mentors.FindAsync(dto.MentorId);
             if (mentor == null)
                 return BadRequest("Mentor does not exist.");

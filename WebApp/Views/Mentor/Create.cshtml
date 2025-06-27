@@ -32,12 +32,12 @@
 
     <div class="form-group">
         <label asp-for="TypeOfWorkId">Type of work</label>
-        <select asp-for="TypeOfWorkId" class="form-control" asp-items="ViewBag.TypeOfWorkId"></select>
+        <select asp-for="TypeOfWorkId" class="form-control" asp-items="@(ViewData["TypeOfWorkList"] as SelectList)"></select>
         <span asp-validation-for="TypeOfWorkId" class="text-danger"></span>
     </div>
 
     <div class="form-group">
-        <label asp-for="AreaIds" class="control-label"> Areas</label>
+        <label asp-for="AreaIds" class="control-label">Areas</label>
         <select asp-for="AreaIds" class="form-control" asp-items="ViewBag.AreaIds" multiple></select>
         <span asp-validation-for="AreaIds" class="text-danger"></span>
     </div>

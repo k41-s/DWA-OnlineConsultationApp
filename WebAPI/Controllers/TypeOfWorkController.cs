@@ -107,13 +107,25 @@ namespace WebAPI.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var type = await _context.TypeOfWorks.FindAsync(id);
-            if (type == null) return NotFound();
-
-            _context.TypeOfWorks.Remove(type);
             try
             {
+                var type = await _context.TypeOfWorks
+                    .Include(t => t.Mentors)
+                    .FirstOrDefaultAsync(t => t.Id == id);
+
+                if (type == null)
+                    return NotFound();
+
+                /* 
+                 * Do not want to cascade delete all mentors related
+                
+                type.Mentors.Clear();
                 await _context.SaveChangesAsync();
+                */
+
+                _context.TypeOfWorks.Remove(type);
+                await _context.SaveChangesAsync();
+
                 return NoContent();
             }
             catch (DbUpdateException)

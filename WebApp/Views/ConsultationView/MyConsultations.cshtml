@@ -6,6 +6,16 @@
 
 <h2 class="mb-4">My Booked Consultations</h2>
 
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="alert alert-warning" role="alert">
+        @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+        {
+            <div>@error.ErrorMessage</div>
+        }
+    </div>
+}
+
 @if (!Model.Any())
 {
     <p>You haven't booked any consultations yet.</p>

@@ -140,6 +140,10 @@ namespace WebAPI.Controllers
             mentor.Surname = dto.Surname;
             mentor.TypeOfWorkId = dto.TypeOfWorkId;
             mentor.Areas = areas;
+            mentor.ImagePath = dto.ImagePath;
+
+            // for some reason this threw errors
+            //mentor = _mapper.Map<Mentor>(dto);
 
             if (id != mentor.Id)
             {

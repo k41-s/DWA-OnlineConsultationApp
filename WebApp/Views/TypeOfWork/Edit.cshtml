@@ -6,6 +6,16 @@
 
 <h2>@ViewData["Title"]</h2>
 
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="alert alert-warning" role="alert">
+        @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+        {
+            <div>@error.ErrorMessage</div>
+        }
+    </div>
+}
+
 <form asp-action="Edit">
     <input type="hidden" asp-for="Id" />
     <div class="form-group">

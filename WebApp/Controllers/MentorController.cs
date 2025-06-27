@@ -26,25 +26,11 @@ namespace WebApp.Controllers
         public async Task<IActionResult> Index(
             string name, 
             int? typeOfWorkId, 
-            int page = 1, 
-            int pageSize = 10)
+            int page = 1)
         {
+            int pageSize = 10;
+
             var client = _clientFactory.CreateClient("ApiClient");
-
-            var queryParams = new List<string>();
-
-            if (!string.IsNullOrEmpty(name))
-                queryParams.Add($"name={Uri.EscapeDataString(name)}");
-
-            if (typeOfWorkId.HasValue && typeOfWorkId.Value > 0)
-                queryParams.Add($"typeOfWorkId={typeOfWorkId}");
-
-            queryParams.Add($"page={page}");
-            queryParams.Add($"pageSize={pageSize}");
-
-            var url = "/api/mentors/search";
-            if (queryParams.Count > 0)
-                url += "?" + string.Join("&", queryParams);
 
             var token = User.Claims.FirstOrDefault(c => c.Type == "AccessToken")?.Value;
 
@@ -53,34 +39,48 @@ namespace WebApp.Controllers
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
-            var response = await client.GetAsync(url);
+            var queryParams = new List<string>();
+
+            if (!string.IsNullOrEmpty(name))
+                queryParams.Add($"name={Uri.EscapeDataString(name)}");
+
+            if (typeOfWorkId.HasValue && typeOfWorkId > 0)
+                queryParams.Add($"typeOfWorkId={typeOfWorkId}");
+
+            queryParams.Add($"page={page}");
+            queryParams.Add($"pageSize={pageSize}");
+
+            string queryString = string.Join('&', queryParams);
+
+            var response = await client.GetAsync($"/api/mentors/search?{queryString}");
+
             if (!response.IsSuccessStatusCode)
             {
-                return View(new List<MentorViewModel>());
+                return View("Error", new ErrorViewModel { RequestId = "Failed to load mentors." });
             }
 
             var mentorDtos = await response.Content.ReadFromJsonAsync<List<MentorDTO>>();
+            if (mentorDtos == null)
+            {
+                return View("Error", new ErrorViewModel { RequestId = "Invalid data from API." });
+            }
+
             var mentorVMs = _mapper.Map<List<MentorViewModel>>(mentorDtos);
 
             await PopulateDropdownsAsync();
 
-            ViewBag.Page = page;
-            ViewBag.PageSize = pageSize;
             int totalItems = 0;
-
-
-
             if (response.Headers.TryGetValues("X-Total-Count", out var totalValues))
             {
                 int.TryParse(totalValues.FirstOrDefault(), out totalItems);
             }
 
-            ViewBag.TotalItems = totalItems;
+            int totalPages = (int)Math.Ceiling(totalItems / (double)pageSize);
 
             ViewData["CurrentSearch"] = name;
             ViewData["CurrentTypeOfWorkId"] = typeOfWorkId;
             ViewData["CurrentPage"] = page;
-            ViewData["TotalPages"] = totalItems;
+            ViewData["TotalPages"] = totalPages;
 
             if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
                 return PartialView("_MentorListPartial", mentorVMs);
@@ -228,6 +228,7 @@ namespace WebApp.Controllers
             }
 
             // Handle image upload if provided
+            string? imagePath = null;
             if (Request.Form.Files.Count > 0)
             {
                 var imageFile = Request.Form.Files[0];
@@ -245,11 +246,12 @@ namespace WebApp.Controllers
                         await imageFile.CopyToAsync(stream);
                     }
 
-                    vm.ImagePath = "/uploads/" + uniqueFileName;
+                    imagePath = "/uploads/" + uniqueFileName;
                 }
             }
 
-            var mentorDto = _mapper.Map<MentorDTO>(vm);
+            var mentorDto = _mapper.Map<MentorCreateDTO>(vm);
+            mentorDto.ImagePath = imagePath;
 
             var response = await client.PutAsJsonAsync($"/api/mentors/{id}", mentorDto);
 

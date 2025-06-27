@@ -17,8 +17,10 @@ namespace WebApp.Profiles
             // Login (usually one-way, no reverse mapping needed)
             CreateMap<LoginViewModel, LoginDTO>();
             CreateMap<UserDTO, ProfileViewModel>().ReverseMap();
+
             // Mentor
             CreateMap<MentorViewModel, MentorDTO>().ReverseMap();
+            CreateMap<MentorViewModel, MentorCreateDTO>().ReverseMap();
 
             // MyConsultation
             CreateMap<MyConsultationViewModel, ConsultationDTO>().ReverseMap();

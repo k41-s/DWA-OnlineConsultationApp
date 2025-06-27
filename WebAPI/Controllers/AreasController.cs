@@ -106,9 +106,15 @@ namespace WebAPI.Controllers
         {
             try
             {
-                var area = await _context.Areas.FindAsync(id);
+                var area = await _context.Areas
+                    .Include(a => a.Mentors)
+                    .FirstOrDefaultAsync(a => a.Id == id);
+
                 if (area == null)
                     return NotFound($"Area with ID {id} not found.");
+
+                area.Mentors.Clear();
+                await _context.SaveChangesAsync();
 
                 _context.Areas.Remove(area);
                 await _context.SaveChangesAsync();

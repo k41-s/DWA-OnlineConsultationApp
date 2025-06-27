@@ -15,7 +15,6 @@ namespace WebApp.Controllers
     {
         private readonly IHttpClientFactory _clientFactory;
         private readonly IMapper _mapper;
-        private const int PageSize = 10;
 
         public UserViewController(IHttpClientFactory clientFactory, IMapper mapper)
         {
@@ -24,8 +23,13 @@ namespace WebApp.Controllers
         }
 
         // GET: UserView
-        public async Task<IActionResult> Index(string? name, int? typeOfWorkId, int page = 1)
+        public async Task<IActionResult> Index(
+            string? name, 
+            int? typeOfWorkId, 
+            int page = 1)
         {
+            int pageSize = 10;
+
             var client = _clientFactory.CreateClient("ApiClient");
 
             var token = User.Claims.FirstOrDefault(c => c.Type == "AccessToken")?.Value;
@@ -44,7 +48,7 @@ namespace WebApp.Controllers
                 queryParams.Add($"typeOfWorkId={typeOfWorkId}");
 
             queryParams.Add($"page={page}");
-            queryParams.Add($"pageSize={PageSize}");
+            queryParams.Add($"pageSize={pageSize}");
 
             string queryString = string.Join('&', queryParams);
 
@@ -70,7 +74,7 @@ namespace WebApp.Controllers
                 int.TryParse(totalValues.FirstOrDefault(), out totalMentors);
             }
 
-            int totalPages = (int)Math.Ceiling(totalMentors / (double)PageSize);
+            int totalPages = (int)Math.Ceiling(totalMentors / (double)pageSize);
 
             ViewData["CurrentSearch"] = name;
             ViewData["CurrentTypeOfWorkId"] = typeOfWorkId;

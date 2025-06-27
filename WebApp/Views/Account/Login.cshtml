@@ -6,6 +6,16 @@
 
 <h2>Login</h2>
 
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="alert alert-warning" role="alert">
+        @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+        {
+            <div>@error.ErrorMessage</div>
+        }
+    </div>
+}
+
 <form asp-action="Login" method="post">
     <div class="form-group">
         <label asp-for="Email"></label>

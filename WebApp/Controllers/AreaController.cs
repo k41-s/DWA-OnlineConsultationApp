@@ -53,6 +53,19 @@ namespace WebApp.Controllers
         {
             if (!ModelState.IsValid) return View(vm);
 
+            // Check for existing TypeOfWork by name before creating
+            var allResponse = await _client.GetAsync("/api/areas");
+
+            var allDtos = allResponse.IsSuccessStatusCode
+                ? await allResponse.Content.ReadFromJsonAsync<List<AreaDTO>>()
+                : new List<AreaDTO>();
+
+            if (allDtos.Any(t => string.Equals(t.Name, vm.Name, StringComparison.OrdinalIgnoreCase)))
+            {
+                ModelState.AddModelError("", "An area with this name already exists.");
+                return View(vm);
+            }
+
             var dto = _mapper.Map<AreaCreateDTO>(vm);
             var response = await _client.PostAsJsonAsync("api/areas", dto);
 
